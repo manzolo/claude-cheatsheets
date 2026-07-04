@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: MCP in pratica</span>
+
+<div class="hero">
+  <h1>MCP in pratica <span class="accent">&#8644;</span></h1>
+  <div class="sub">Tre integrazioni reali passo-passo: Sentry per il debugging in produzione, GitHub per issue e PR, il database in sola lettura. Più risorse @, prompt /mcp__ e il server dedicato a un subagente.</div>
+  <div class="meta">Aggiornato: luglio 2026 · Fonte: documentazione ufficiale Anthropic (code.claude.com/docs) · Vol. 12 (extra) della serie — teoria e sicurezza nel vol. 7.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>Esempio 1: Sentry — errori di produzione in chat <span class="tag">HTTP remoto + OAuth</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># 1. aggiungi il server remoto</span>
+claude mcp add --transport http sentry \
+  https://mcp.sentry.dev/mcp
+
+<span class="cm"># 2. in sessione: autenticati nel browser</span>
+/mcp
+
+<span class="cm"># 3. e poi chiedi, in italiano</span>
+"Quali sono gli errori più frequenti
+ nelle ultime 24 ore?"
+"Mostrami lo stack trace dell'errore abc123"
+"Quale deployment ha introdotto
+ questi errori nuovi?"</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>Il flusso OAuth, una volta sola</h4>
+      <ul>
+        <li>Il server risponde 401/403 &#8594; <span class="kbd">/mcp</span> lo marca "da autenticare": scegli il server, si apre il browser, login e via. I token sono salvati e <b>rinnovati da soli</b>; "Clear authentication" nel menu revoca.</li>
+        <li>Da terminale: <code>claude mcp login sentry</code>; via SSH aggiungi <code>--no-browser</code> e apri l'URL stampato sulla tua macchina.</li>
+        <li>Se un refresh fallisce, Claude Code ti punta subito a <span class="kbd">/mcp</span> &#8594; "Re-authenticate" (v2.1.195+): niente tool call che muoiono in silenzio.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Esempio 2: GitHub — issue e PR senza cambiare finestra <span class="tag">HTTP + token nel header</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># token fine-grained da
+# github.com/settings/personal-access-tokens
+# con accesso ai soli repo che servono</span>
+claude mcp add --transport http github \
+  https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer IL_TUO_PAT"
+
+<span class="cm"># poi:</span>
+"Fai la review della PR #456 e suggerisci
+ miglioramenti"
+"Apri una issue per il bug che abbiamo
+ appena trovato"
+"Mostrami le PR aperte assegnate a me"</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Le regole del token</h4>
+      <ul>
+        <li>Auth <b>statica nel header</b> (niente OAuth): il PAT fine-grained limita il raggio d'azione ai repo scelti. Se il server rifiuta il header configurato, la connessione risulta fallita — Claude Code <i>non</i> ripiega su OAuth: controlla il token o togli il header.</li>
+        <li>Occhio allo scope: il comando sopra salva in <code>local</code> (default, solo tu, solo quel progetto). Il token <b>non</b> va in <code>--scope project</code> / <code>.mcp.json</code>, che finisce in git.</li>
+        <li>Permessi granulari sui tool: <code>mcp__github__get_*</code> in allow, oppure <code>mcp__github</code> in deny per spegnere tutto il server (vol. 7).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Esempio 3: il database interrogabile <span class="tag">stdio locale + DSN read-only</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># server stdio: gira sulla tua macchina;
+# il -- separa i flag di Claude dal comando</span>
+claude mcp add --transport stdio db -- \
+  npx -y @bytebase/dbhub \
+  --dsn "postgresql://readonly:pass@prod.db.com:5432/analytics"
+
+<span class="cm"># poi interroga in linguaggio naturale:</span>
+"Qual è il fatturato totale di questo mese?"
+"Mostrami lo schema della tabella orders"
+"Trova i clienti senza acquisti da 90 giorni"</pre>
+  </div>
+  <div>
+    <div class="notebox red">
+      <h4>La sicurezza sta nel DSN</h4>
+      <p>La misura di sicurezza vera è l'utenza <code>readonly</code> <b>nel database</b>: qualunque cosa Claude chieda, il DB rifiuta le scritture. Difesa in profondità: la stessa filosofia dell'hook che filtra le SELECT nel vol. 10 — lì a livello subagente, qui a livello credenziali. Per le credenziali usa <code>--env</code> o tienile fuori da <code>.mcp.json</code> condiviso.</p>
+    </div>
+    <div class="notebox">
+      <h4>Ricorda (vol. 7)</h4>
+      <ul>
+        <li>I server di un <code>.mcp.json</code> appena clonato restano in attesa di approvazione; reset con <code>claude mcp reset-project-choices</code>.</li>
+        <li>Stato e conteggio tool: <span class="kbd">/mcp</span>; da shell <code>claude mcp list / get / remove</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Oltre i tool: risorse @ e prompt / <span class="tag">il server come fonte e come comando</span></h2>
+
+<div class="duo">
+  <div>
+    <div class="notebox plum">
+      <h4>Risorse: @server:protocollo://path</h4>
+      <ul>
+        <li>Digita <code>@</code> e le risorse dei server connessi appaiono accanto ai file, con fuzzy search.</li>
+        <li><i>"Analizza <code>@github:issue://123</code> e proponi un fix"</i></li>
+        <li>Più risorse nello stesso prompt: <i>"Confronta <code>@postgres:schema://users</code> con <code>@docs:file://database/user-model</code>"</i></li>
+        <li>La risorsa viene fetchata e allegata da sola: niente copia-incolla.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>Prompt del server: /mcp__server__prompt</h4>
+      <ul>
+        <li>I prompt esposti da un server diventano comandi: digita <code>/</code> e compaiono come <code>/mcp__nomeserver__nomeprompt</code>.</li>
+        <li>Senza argomenti: <span class="kbd">/mcp__github__list_prs</span></li>
+        <li>Con argomenti, separati da spazio: <span class="kbd">/mcp__github__pr_review 456</span> · <span class="kbd">/mcp__jira__create_issue "Bug login" high</span></li>
+        <li>Scoperti dinamicamente dai server connessi; il risultato viene iniettato in conversazione.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>Il server di un solo subagente <span class="tag">ponte col vol. 10</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/agents/browser-tester.md
+# il server esiste solo mentre
+# il subagente lavora</span>
+---
+name: browser-tester
+description: Testa le feature in un
+  browser reale con Playwright.
+mcpServers:
+  - playwright:
+      type: stdio
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+---</pre>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>Quando conviene</h4>
+      <ul>
+        <li>Server usato solo da un flusso specifico? Definiscilo <b>inline nel subagente</b>, non in <code>.mcp.json</code>: il main non paga le definizioni dei tool in contesto e il server si accende/spegne col worker.</li>
+        <li>Il tool search (attivo di default) rende comunque leggeri i server con tanti tool: in contesto entrano solo i nomi finché un tool non serve. Per i pochi tool che servono <i>sempre</i>: <code>"alwaysLoad": true</code> sul server in <code>.mcp.json</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; Checklist prima di connettere</h3>
+  <p><b>1.</b> Il server è nella Anthropic Directory (claude.ai/directory) o l'hai ispezionato? I server che fetchano contenuti esterni espongono a prompt injection. <b>2.</b> Credenziali nel posto giusto: scope <code>local</code> o <code>--env</code>, mai token in <code>.mcp.json</code> committato. <b>3.</b> Minimo privilegio: PAT fine-grained, utenze DB read-only, regole <code>mcp__server__tool</code> nei permessi. <b>4.</b> Connetti a inizio sessione: aggiungere server a metà invalida la cache dei prompt (vol. 3).</p>
+</div>
+
+<div class="footer-note">Fonti: code.claude.com/docs — mcp (practical examples, authenticate, resources, prompts, tool search) · Teoria, transport e scope: vol. 7 · Subagenti: vol. 10.</div>
+</body></html>

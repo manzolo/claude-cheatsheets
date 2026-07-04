@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: comandi custom in pratica</span>
+
+<div class="hero">
+  <h1>Comandi custom in pratica <span class="accent">&#9889;</span></h1>
+  <div class="sub">Il tuo /comando su misura in tre esempi: il deploy che parte solo se lo digiti tu, il fix-issue parametrico, la migrazione con più argomenti.</div>
+  <div class="meta">Aggiornato: luglio 2026 · Fonte: documentazione ufficiale Anthropic (code.claude.com/docs) · Vol. 11 (extra) della serie — skills nel vol. 9.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>Comandi = skill, oggi <span class="tag">la fusione da sapere</span></h2>
+
+<p class="body-p">I custom command sono stati <b>fusi nelle skill</b>: <code>.claude/commands/deploy.md</code> e <code>.claude/skills/deploy/SKILL.md</code> creano entrambi <code>/deploy</code> e funzionano allo stesso modo. I file in <code>.claude/commands/</code> continuano a valere (nome file senza estensione = nome comando) e supportano lo stesso frontmatter; a parità di nome vince la skill. Preferisci la forma skill per le feature in più: directory di file di supporto, controllo di chi la invoca, caricamento automatico quando rilevante. Questo volume copre il caso "comando": <b>workflow che lanci tu</b>, con argomenti.</p>
+
+<table class="ref">
+  <tr><th style="width:34%;">Frontmatter</th><th style="width:22%;">Tu puoi invocarla</th><th style="width:22%;">Claude può invocarla</th><th>Quando in contesto</th></tr>
+  <tr><td class="k">(default)</td><td>Sì</td><td>Sì</td><td>Description sempre; corpo all'invocazione</td></tr>
+  <tr><td class="k">disable-model-invocation: true</td><td>Sì</td><td><b>No</b></td><td>Niente in contesto finché non la lanci tu</td></tr>
+  <tr><td class="k">user-invocable: false</td><td><b>No</b></td><td>Sì</td><td>Description sempre; corpo all'invocazione</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Esempio 1: /deploy — il bottone che premi solo tu <span class="tag">disable-model-invocation</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/deploy/SKILL.md</span>
+---
+name: deploy
+description: Deploy dell'applicazione in produzione
+disable-model-invocation: true
+---
+
+Fai il deploy di $ARGUMENTS in produzione:
+
+1. Lancia la suite di test
+2. Builda l'applicazione
+3. Push verso il target di deploy
+4. Verifica che il deploy sia riuscito</pre>
+    <div class="notebox red">
+      <h4>Perché bloccare Claude</h4>
+      <p><code>disable-model-invocation: true</code> = solo tu puoi lanciarla. È la regola per tutto ciò che ha <b>effetti collaterali</b> o di cui vuoi decidere il momento: <code>/deploy</code>, <code>/commit</code>, <code>/send-slack-message</code>. Non vuoi che Claude deployi perché il codice "gli sembra pronto". Bonus: la skill esce anche dal contesto (niente description in giro) finché non la invochi.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>$ARGUMENTS: il testo dopo il comando</h4>
+      <ul>
+        <li><span class="kbd">/deploy api-gateway</span> &#8594; il corpo arriva a Claude con <code>$ARGUMENTS</code> sostituito da <code>api-gateway</code>.</li>
+        <li>Se il corpo non contiene <code>$ARGUMENTS</code> ma tu passi argomenti, Claude Code li accoda comunque come <code>ARGUMENTS: &lt;testo&gt;</code>: niente va perso.</li>
+        <li>Per un <code>$</code> letterale davanti a cifre o ad ARGUMENTS, escapa: <code>\$1.00</code>.</li>
+      </ul>
+    </div>
+    <div class="notebox green">
+      <h4>Pre-approvare i tool del workflow</h4>
+<pre class="code">---
+name: commit
+description: Stage e commit delle modifiche
+disable-model-invocation: true
+allowed-tools: Bash(git add *)
+  Bash(git commit *) Bash(git status *)
+---</pre>
+      <p>Mentre la skill è attiva, i comandi git elencati non chiedono conferma: il workflow fila senza prompt, tutto il resto segue i permessi normali.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Esempio 2: /fix-issue 123 <span class="tag">un argomento, un workflow</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/fix-issue/SKILL.md</span>
+---
+name: fix-issue
+description: Corregge una issue GitHub
+argument-hint: [numero-issue]
+disable-model-invocation: true
+---
+
+Correggi la issue GitHub $ARGUMENTS seguendo
+i nostri standard di codice.
+
+1. Leggi la descrizione della issue
+2. Capisci i requisiti
+3. Implementa la correzione
+4. Scrivi i test
+5. Crea un commit</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>I dettagli che migliorano l'uso</h4>
+      <ul>
+        <li><span class="kbd">/fix-issue 123</span> &#8594; Claude riceve "Correggi la issue GitHub 123&#8230;" e parte col workflow.</li>
+        <li><code>argument-hint</code> compare nell'autocomplete del menu <code>/</code>: chi lo usa sa cosa passare senza aprire il file.</li>
+        <li>Il corpo è una <b>procedura numerata</b>, non una descrizione: per i task-command le istruzioni passo-passo battono la prosa.</li>
+        <li>Si può <b>impilare</b>: da v2.1.199 <span class="kbd">/code-review /fix-issue 123</span> carica entrambe le skill e passa <code>123</code> come $ARGUMENTS a ciascuna (fino a 6 in un messaggio).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Esempio 3: più argomenti posizionali <span class="tag">$0 $1 $2 o nomi parlanti</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/migrate-component/SKILL.md</span>
+---
+name: migrate-component
+description: Migra un componente tra framework
+---
+
+Migra il componente $0 da $1 a $2.
+Preserva comportamento e test esistenti.
+
+<span class="cm"># /migrate-component SearchBar React Vue
+#   $0=SearchBar  $1=React  $2=Vue
+# Quoting shell-style:
+# /my-skill "hello world" second
+#   $0=hello world  $1=second</span></pre>
+  </div>
+  <div>
+<pre class="code"><span class="cm"># Variante con argomenti nominati:
+# i nomi mappano le posizioni in ordine</span>
+---
+name: migrate-component
+description: Migra un componente tra framework
+arguments: [componente, da, a]
+---
+
+Migra il componente $componente da $da a $a.
+Preserva comportamento e test esistenti.</pre>
+    <div class="notebox plum">
+      <h4>Quale forma scegliere</h4>
+      <p><code>$0 $1 $2</code> (o l'equivalente <code>$ARGUMENTS[0]</code>&#8230;) va bene per 2-3 argomenti ovvi; con <code>arguments:</code> in frontmatter il corpo si legge da solo — <code>$componente</code> dice cosa è. <code>$ARGUMENTS</code> resta sempre l'intera stringa come digitata.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>Sostituzioni e contesto dinamico <span class="tag">il toolbox completo</span></h2>
+
+<table class="ref">
+  <tr><th style="width:34%;">Placeholder</th><th>Si espande in</th></tr>
+  <tr><td class="k">$ARGUMENTS</td><td>Tutti gli argomenti, come digitati.</td></tr>
+  <tr><td class="k">$ARGUMENTS[N] &nbsp;/&nbsp; $N</td><td>L'argomento in posizione N (0-based). Quoting shell-style per valori multi-parola.</td></tr>
+  <tr><td class="k">$nome</td><td>Argomento nominato dichiarato in <code>arguments:</code> (mappa le posizioni in ordine).</td></tr>
+  <tr><td class="k">${CLAUDE_SESSION_ID}</td><td>ID della sessione corrente: log, file per-sessione, correlazioni.</td></tr>
+  <tr><td class="k">${CLAUDE_EFFORT}</td><td>Effort attivo (<code>low</code>&#8230;<code>max</code>): istruzioni adattive.</td></tr>
+  <tr><td class="k">${CLAUDE_SKILL_DIR}</td><td>Directory della skill: path a script inclusi, ovunque sia installata.</td></tr>
+  <tr><td class="k">${CLAUDE_PROJECT_DIR}</td><td>Root del progetto (lo stesso path che ricevono gli hook). Vale anche dentro <code>allowed-tools</code>.</td></tr>
+  <tr><td class="k">!`comando` &nbsp;/&nbsp; blocco ```!</td><td><b>Injection dinamica</b>: il comando gira prima che Claude legga, l'output sostituisce la riga (vol. 9, es. 1). Solo con <code>!</code> a inizio riga o dopo spazio. Kill switch di policy: <code>disableSkillShellExecution</code>.</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; Governare i comandi coi permessi</h3>
+  <p>Regole nei permessi: <code>Skill(deploy)</code> match esatto, <code>Skill(review-pr *)</code> prefisso con argomenti qualsiasi, <code>Skill</code> in deny spegne tutte le invocazioni di Claude. Per le skill che non vuoi editare (repo condivisi): <code>skillOverrides</code> in settings con quattro stati — <code>on</code> / <code>name-only</code> (solo il nome in contesto) / <code>user-invocable-only</code> / <code>off</code> — dal menu <span class="kbd">/skills</span> con la barra spaziatrice. E ricorda: <code>allowed-tools</code> di una skill di progetto vale solo dopo che ti sei fidato del workspace — leggi le skill di un repo clonato prima di fidarti.</p>
+</div>
+
+<div class="footer-note">Fonti: code.claude.com/docs — skills (custom commands, string substitutions, invocation control, restrict skill access) · Vol. 9 per skills con file di supporto, vol. 1 per i comandi built-in.</div>
+</body></html>

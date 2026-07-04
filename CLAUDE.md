@@ -1,6 +1,7 @@
 # Claude Cheatsheets — collana di cheatsheet PDF
 
-Collana di 8 PDF su Claude Code e Claude.ai, in italiano e inglese, generati
+Collana di 12 PDF su Claude Code e Claude.ai, in italiano e inglese (volumi
+1-8: fondamenta; 9-12: extra pratici con esempi reali completi), generati
 da sorgenti HTML+CSS con WeasyPrint. Questo repo serve a correggerli,
 aggiornarli ed estenderli nel tempo. Pubblicato su
 github.com/manzolo/claude-cheatsheets (Pages + Releases).
@@ -9,8 +10,8 @@ pubblico (repo, README, zip, indice); al massimo "in stile bignami" minuscolo.
 
 ## Struttura
 
-- `src/it/01-*.html` … `08-*.html` — sorgenti italiani, uno per volume
-- `src/en/01-*.html` … `08-*.html` — sorgenti inglesi, stessi volumi
+- `src/it/01-*.html` … `12-*.html` — sorgenti italiani, uno per volume
+- `src/en/01-*.html` … `12-*.html` — sorgenti inglesi, stessi volumi
   (nomi file tradotti; la corrispondenza vive in VOLUMES in `build.py`)
 - `src/style.css` — foglio di stile condiviso da entrambe le lingue (volumi
   03-08); i volumi 01 e 02 hanno il loro `<style>` inline e NON usano

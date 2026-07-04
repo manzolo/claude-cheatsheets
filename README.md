@@ -3,12 +3,12 @@
 [![build](https://github.com/manzolo/claude-cheatsheets/actions/workflows/build.yml/badge.svg)](https://github.com/manzolo/claude-cheatsheets/actions/workflows/build.yml)
 [![Licenza: CC BY-SA 4.0](https://img.shields.io/badge/licenza-CC%20BY--SA%204.0-d97757)](https://creativecommons.org/licenses/by-sa/4.0/deed.it)
 
-Collana di 8 cheatsheet PDF su **Claude Code** e **Claude.ai**, in **italiano
+Collana di 12 cheatsheet PDF su **Claude Code** e **Claude.ai**, in **italiano
 e inglese**: pagine dense in stile bignami da tenere accanto alla tastiera,
 generate da sorgenti HTML+CSS con [WeasyPrint](https://weasyprint.org/) e
 verificate sulla documentazione ufficiale Anthropic.
 
-*A series of 8 PDF cheatsheets on Claude Code and Claude.ai, in Italian and
+*A series of 12 PDF cheatsheets on Claude Code and Claude.ai, in Italian and
 English, built from HTML+CSS sources with WeasyPrint and checked against the
 official Anthropic docs.*
 
@@ -32,6 +32,15 @@ official Anthropic docs.*
 | 6 | Lavoro parallelo e cloud | Parallel work and cloud |
 | 7 | MCP fatto bene | MCP done right |
 | 8 | Claude.ai: l'app oltre il codice | Claude.ai: the app beyond code |
+| 9 | Extra · Skills in pratica | Extra · Skills in practice |
+| 10 | Extra · Subagents in pratica | Extra · Subagents in practice |
+| 11 | Extra · Comandi custom in pratica | Extra · Custom commands in practice |
+| 12 | Extra · MCP in pratica | Extra · MCP in practice |
+
+I volumi 9-12 sono "extra" pratici: esempi reali completi da copiare (skill,
+subagent, comandi custom e integrazioni MCP), verificati sulla documentazione
+ufficiale. / *Volumes 9-12 are hands-on extras with complete real-world
+examples.*
 
 ## 🔨 Buildare in locale / Local build
 

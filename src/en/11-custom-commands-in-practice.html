@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: custom commands in practice</span>
+
+<div class="hero">
+  <h1>Custom commands in practice <span class="accent">&#9889;</span></h1>
+  <div class="sub">Your tailor-made /command in three examples: the deploy that runs only when you type it, the parametric fix-issue, the multi-argument migration.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 11 (extra) of the series — skills in vol. 9.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>Commands = skills, today <span class="tag">the merge you need to know</span></h2>
+
+<p class="body-p">Custom commands have been <b>merged into skills</b>: <code>.claude/commands/deploy.md</code> and <code>.claude/skills/deploy/SKILL.md</code> both create <code>/deploy</code> and work the same way. Files in <code>.claude/commands/</code> still count (file name without extension = command name) and support the same frontmatter; on a name clash the skill wins. Prefer the skill form for the extra features: a directory of supporting files, control over who invokes it, automatic loading when relevant. This volume covers the "command" case: <b>workflows you launch yourself</b>, with arguments.</p>
+
+<table class="ref">
+  <tr><th style="width:34%;">Frontmatter</th><th style="width:22%;">You can invoke it</th><th style="width:22%;">Claude can invoke it</th><th>When in context</th></tr>
+  <tr><td class="k">(default)</td><td>Yes</td><td>Yes</td><td>Description always; body on invocation</td></tr>
+  <tr><td class="k">disable-model-invocation: true</td><td>Yes</td><td><b>No</b></td><td>Nothing in context until you launch it</td></tr>
+  <tr><td class="k">user-invocable: false</td><td><b>No</b></td><td>Yes</td><td>Description always; body on invocation</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Example 1: /deploy — the button only you press <span class="tag">disable-model-invocation</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/deploy/SKILL.md</span>
+---
+name: deploy
+description: Deploy the application to production
+disable-model-invocation: true
+---
+
+Deploy $ARGUMENTS to production:
+
+1. Run the test suite
+2. Build the application
+3. Push to the deploy target
+4. Verify the deploy succeeded</pre>
+    <div class="notebox red">
+      <h4>Why block Claude</h4>
+      <p><code>disable-model-invocation: true</code> = only you can launch it. It's the rule for anything with <b>side effects</b> or whose timing you want to decide: <code>/deploy</code>, <code>/commit</code>, <code>/send-slack-message</code>. You don't want Claude deploying because the code "looks ready to it". Bonus: the skill also drops out of context (no description hanging around) until you invoke it.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>$ARGUMENTS: the text after the command</h4>
+      <ul>
+        <li><span class="kbd">/deploy api-gateway</span> &#8594; the body reaches Claude with <code>$ARGUMENTS</code> replaced by <code>api-gateway</code>.</li>
+        <li>If the body doesn't contain <code>$ARGUMENTS</code> but you pass arguments, Claude Code still appends them as <code>ARGUMENTS: &lt;text&gt;</code>: nothing gets lost.</li>
+        <li>For a literal <code>$</code> before digits or ARGUMENTS, escape it: <code>\$1.00</code>.</li>
+      </ul>
+    </div>
+    <div class="notebox green">
+      <h4>Pre-approving the workflow's tools</h4>
+<pre class="code">---
+name: commit
+description: Stage and commit the changes
+disable-model-invocation: true
+allowed-tools: Bash(git add *)
+  Bash(git commit *) Bash(git status *)
+---</pre>
+      <p>While the skill is active, the listed git commands don't ask for confirmation: the workflow flows without prompts, everything else follows the normal permissions.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Example 2: /fix-issue 123 <span class="tag">one argument, one workflow</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/fix-issue/SKILL.md</span>
+---
+name: fix-issue
+description: Fixes a GitHub issue
+argument-hint: [issue-number]
+disable-model-invocation: true
+---
+
+Fix GitHub issue $ARGUMENTS following
+our coding standards.
+
+1. Read the issue description
+2. Understand the requirements
+3. Implement the fix
+4. Write the tests
+5. Create a commit</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>The details that improve usage</h4>
+      <ul>
+        <li><span class="kbd">/fix-issue 123</span> &#8594; Claude receives "Fix GitHub issue 123&#8230;" and starts the workflow.</li>
+        <li><code>argument-hint</code> shows up in the <code>/</code> menu's autocomplete: users know what to pass without opening the file.</li>
+        <li>The body is a <b>numbered procedure</b>, not a description: for task-commands, step-by-step instructions beat prose.</li>
+        <li>They can be <b>stacked</b>: since v2.1.199 <span class="kbd">/code-review /fix-issue 123</span> loads both skills and passes <code>123</code> as $ARGUMENTS to each (up to 6 in one message).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Example 3: multiple positional arguments <span class="tag">$0 $1 $2 or telling names</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/migrate-component/SKILL.md</span>
+---
+name: migrate-component
+description: Migrates a component across frameworks
+---
+
+Migrate the component $0 from $1 to $2.
+Preserve existing behavior and tests.
+
+<span class="cm"># /migrate-component SearchBar React Vue
+#   $0=SearchBar  $1=React  $2=Vue
+# Shell-style quoting:
+# /my-skill "hello world" second
+#   $0=hello world  $1=second</span></pre>
+  </div>
+  <div>
+<pre class="code"><span class="cm"># Variant with named arguments:
+# names map to positions in order</span>
+---
+name: migrate-component
+description: Migrates a component across frameworks
+arguments: [component, from, to]
+---
+
+Migrate the component $component from $from to $to.
+Preserve existing behavior and tests.</pre>
+    <div class="notebox plum">
+      <h4>Which form to choose</h4>
+      <p><code>$0 $1 $2</code> (or the equivalent <code>$ARGUMENTS[0]</code>&#8230;) is fine for 2-3 obvious arguments; with <code>arguments:</code> in the frontmatter the body reads itself — <code>$component</code> says what it is. <code>$ARGUMENTS</code> is always still the whole string as typed.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>Substitutions and dynamic context <span class="tag">the full toolbox</span></h2>
+
+<table class="ref">
+  <tr><th style="width:34%;">Placeholder</th><th>Expands to</th></tr>
+  <tr><td class="k">$ARGUMENTS</td><td>All arguments, as typed.</td></tr>
+  <tr><td class="k">$ARGUMENTS[N] &nbsp;/&nbsp; $N</td><td>The argument at position N (0-based). Shell-style quoting for multi-word values.</td></tr>
+  <tr><td class="k">$name</td><td>Named argument declared in <code>arguments:</code> (maps positions in order).</td></tr>
+  <tr><td class="k">${CLAUDE_SESSION_ID}</td><td>Current session ID: logs, per-session files, correlation.</td></tr>
+  <tr><td class="k">${CLAUDE_EFFORT}</td><td>Active effort (<code>low</code>&#8230;<code>max</code>): adaptive instructions.</td></tr>
+  <tr><td class="k">${CLAUDE_SKILL_DIR}</td><td>The skill's directory: paths to bundled scripts, wherever it's installed.</td></tr>
+  <tr><td class="k">${CLAUDE_PROJECT_DIR}</td><td>Project root (the same path hooks receive). Also works inside <code>allowed-tools</code>.</td></tr>
+  <tr><td class="k">!`command` &nbsp;/&nbsp; ```! block</td><td><b>Dynamic injection</b>: the command runs before Claude reads, its output replaces the line (vol. 9, ex. 1). Only with <code>!</code> at line start or after a space. Policy kill switch: <code>disableSkillShellExecution</code>.</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; Governing commands with permissions</h3>
+  <p>Rules in permissions: <code>Skill(deploy)</code> exact match, <code>Skill(review-pr *)</code> prefix with any arguments, <code>Skill</code> in deny turns off all Claude invocations. For skills you don't want to edit (shared repos): <code>skillOverrides</code> in settings with four states — <code>on</code> / <code>name-only</code> (only the name in context) / <code>user-invocable-only</code> / <code>off</code> — from the <span class="kbd">/skills</span> menu with the space bar. And remember: a project skill's <code>allowed-tools</code> only counts after you've trusted the workspace — read a cloned repo's skills before trusting it.</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — skills (custom commands, string substitutions, invocation control, restrict skill access) · Vol. 9 for skills with supporting files, vol. 1 for the built-in commands.</div>
+</body></html>

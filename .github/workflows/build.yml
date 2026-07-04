@@ -14,8 +14,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       # Dipendenze di sistema di WeasyPrint + il font DejaVu usato dai volumi
@@ -29,12 +29,12 @@ jobs:
         run: python3 build.py --zip --index
       - name: Sanity check
         run: |
-          test "$(ls output/it/*.pdf | wc -l)" -eq 8
-          test "$(ls output/en/*.pdf | wc -l)" -eq 8
+          test "$(ls output/it/*.pdf | wc -l)" -eq 12
+          test "$(ls output/en/*.pdf | wc -l)" -eq 12
           test -s output/claude-cheatsheets-it.zip
           test -s output/claude-cheatsheets-en.zip
           test -s output/index.html
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pdfs
           path: output/
@@ -50,14 +50,14 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: pdfs
           path: site
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
 
   release:
@@ -67,7 +67,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: pdfs
           path: output

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: skills in practice</span>
+
+<div class="hero">
+  <h1>Skills in practice <span class="accent">&#10022;</span></h1>
+  <div class="sub">Three complete skills to copy today: the diff summary with dynamic context, team conventions that load themselves, the tool with a bundled script.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 9 (extra) of the series — theory in vol. 2.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>The anatomy in 60 seconds <span class="tag">one directory, one SKILL.md</span></h2>
+
+<p class="body-p">A skill is a directory containing a <code>SKILL.md</code>: YAML frontmatter between <code>---</code> (tells Claude <b>when</b> to use it) and a markdown body (the instructions it follows <b>when</b> it uses it). The directory name becomes the command you type; the <code>description</code> decides when Claude loads it on its own. The body enters context only on invocation: long material costs almost nothing until it's needed. The old custom commands have been <b>merged into skills</b>: <code>.claude/commands/deploy.md</code> and <code>.claude/skills/deploy/SKILL.md</code> both create <code>/deploy</code> (vol. 11).</p>
+
+<table class="ref">
+  <tr><th style="width:14%;">Level</th><th style="width:44%;">Path</th><th>Applies to</th></tr>
+  <tr><td class="kw">Personal</td><td><code>~/.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>All your projects</td></tr>
+  <tr><td class="kw">Project</td><td><code>.claude/skills/&lt;name&gt;/SKILL.md</code></td><td>That project only (commit it: the team uses it)</td></tr>
+  <tr><td class="kw">Plugin</td><td><code>&lt;plugin&gt;/skills/&lt;name&gt;/SKILL.md</code></td><td>Wherever the plugin is enabled, as <code>/plugin:name</code></td></tr>
+  <tr><td class="kw">Enterprise</td><td>managed settings</td><td>The whole organization (wins over the others)</td></tr>
+</table>
+<p class="body-p small">The directories are <b>watched</b>: new or edited skills take effect immediately, no restart. On a name clash: enterprise &gt; personal &gt; project, and a skill of yours replaces the bundled one with the same name.</p>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Example 1: the diff summary <span class="tag">dynamic context with !`command`</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># ~/.claude/skills/summarize-changes/SKILL.md</span>
+---
+description: Summarizes uncommitted changes and
+  flags the risks. Use it when the user asks what
+  changed, wants a commit message or a review
+  of their diff.
+---
+
+## Current changes
+
+!`git diff HEAD`
+
+## Instructions
+
+Summarize the changes above in two or three
+points, then list the risks you notice: missing
+error handling, hardcoded values, tests to update.
+If the diff is empty, say there are no changes.</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>Why it works</h4>
+      <ul>
+        <li>The line <code>!`git diff HEAD`</code> is <b>dynamic context injection</b>: Claude Code runs the command <i>before</i> Claude reads the skill and replaces the line with the output — Claude receives the real diff, not the command. Multi-line: fenced block opened with <code>```!</code>.</li>
+        <li>The <code>description</code> contains the phrases you would actually say ("what changed", "commit message"): that's what Claude matches on for automatic invocation.</li>
+      </ul>
+    </div>
+    <div class="notebox">
+      <h4>Try it 2 ways</h4>
+      <p>Edit any file and ask <i>"What did I change?"</i> (automatic invocation) or type <span class="kbd">/summarize-changes</span> (direct). Same skill, two triggers.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Example 2: knowledge that loads itself <span class="tag">user-invocable: false + paths</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/api-conventions/SKILL.md</span>
+---
+name: api-conventions
+description: API design patterns for this
+  repo. Applies when writing or modifying
+  endpoints.
+user-invocable: false
+paths:
+  - "src/api/**"
+---
+
+When writing API endpoints:
+- RESTful resource naming
+- Consistent error format
+- Validation of incoming requests</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>The "reference content" pattern</h4>
+      <ul>
+        <li>It's background knowledge, not an action: <code>user-invocable: false</code> hides it from the <code>/</code> menu — only Claude invokes it, when needed.</li>
+        <li><code>paths</code> limits automatic activation to files matching the globs: API conventions don't pollute the context while you work on CSS.</li>
+        <li>Alternative to CLAUDE.md: when a CLAUDE.md section has become a <i>procedure</i> more than a fact, move it into a skill — you pay only when it's used. And keep the body lean: once invoked it <b>stays in context</b> for the whole session.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Example 3: the skill with the script inside <span class="tag">supporting files + ${CLAUDE_SKILL_DIR}</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># ~/.claude/skills/codebase-visualizer/
+#   &#9500;&#9472; SKILL.md
+#   &#9492;&#9472; scripts/visualize.py</span>
+---
+name: codebase-visualizer
+description: Generates an interactive tree
+  view of the codebase. Use it to explore a
+  new repo or find the large files.
+allowed-tools: Bash(python3 *)
+---
+
+Run the script from the project root:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/visualize.py .
+```
+
+Creates `codebase-map.html` and opens it in the browser.</pre>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>The "bundled script" pattern</h4>
+      <ul>
+        <li>The script does the heavy lifting, Claude orchestrates. Works for any visual output: dependency graphs, coverage, DB schemas.</li>
+        <li><code>${CLAUDE_SKILL_DIR}</code> expands to the skill's directory: the script path is right wherever it's installed.</li>
+        <li><code>allowed-tools: Bash(python3 *)</code> pre-approves only what's needed; everything else follows normal permissions.</li>
+        <li>Other useful files: <code>reference.md</code>, <code>examples/</code>, templates — cite them from SKILL.md so Claude knows when to open them. Keep SKILL.md under 500 lines.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>The frontmatter that matters <span class="tag">all optional, description recommended</span></h2>
+
+<table class="ref">
+  <tr><th style="width:30%;">Field</th><th>Effect</th></tr>
+  <tr><td class="k">description / when_to_use</td><td>How Claude decides whether to load it on its own. Key use case first: in the listing the combined text is truncated at 1,536 characters.</td></tr>
+  <tr><td class="k">disable-model-invocation / user-invocable</td><td>The first set to <code>true</code> = only you (deploy, commit — you pick the moment); the second set to <code>false</code> = only Claude (background knowledge, out of the <code>/</code> menu).</td></tr>
+  <tr><td class="k">allowed-tools / disallowed-tools</td><td>Pre-approves tools while the skill is active / removes them from the pool (until your next message).</td></tr>
+  <tr><td class="k">argument-hint / arguments</td><td>Hint in autocomplete (e.g. <code>[issue-number]</code>) / names for positional arguments (vol. 11).</td></tr>
+  <tr><td class="k">context: fork &nbsp;+&nbsp; agent</td><td>Runs the skill in an isolated subagent; <code>agent</code> picks which one (e.g. <code>Explore</code>). Only for skills with an explicit task.</td></tr>
+  <tr><td class="k">model / effort / paths / hooks</td><td>Model or effort override for the turn / globs that limit automatic activation / hooks scoped to the skill.</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; If something goes wrong</h3>
+  <p><b>Not triggering?</b> Put in the description the words the user would actually say; with too many skills the listing gets shortened — <span class="kbd">/doctor</span> tells you which descriptions are cut. Broken YAML = skill without metadata: <code>/name</code> works, auto-invocation doesn't. <b>Triggering too much?</b> More specific description or <code>disable-model-invocation: true</code>. To measure it properly: <code>/plugin install skill-creator@claude-plugins-official</code> runs A/B evals with and without the skill.</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — skills (getting started, frontmatter reference, advanced patterns, troubleshooting) · Open standard: agentskills.io</div>
+</body></html>

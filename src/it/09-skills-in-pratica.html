@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: skills in pratica</span>
+
+<div class="hero">
+  <h1>Skills in pratica <span class="accent">&#10022;</span></h1>
+  <div class="sub">Tre skill complete da copiare oggi: il riassunto del diff con contesto dinamico, le convenzioni di team che si caricano da sole, il tool con script incluso.</div>
+  <div class="meta">Aggiornato: luglio 2026 · Fonte: documentazione ufficiale Anthropic (code.claude.com/docs) · Vol. 9 (extra) della serie — teoria nel vol. 2.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>L'anatomia in 60 secondi <span class="tag">una directory, un SKILL.md</span></h2>
+
+<p class="body-p">Una skill è una directory con dentro un <code>SKILL.md</code>: frontmatter YAML tra <code>---</code> (dice a Claude <b>quando</b> usarla) e corpo markdown (le istruzioni che segue <b>quando</b> la usa). Il nome della directory diventa il comando che digiti; la <code>description</code> decide quando Claude la carica da solo. Il corpo entra in contesto solo all'invocazione: materiale lungo non costa quasi nulla finché non serve. I vecchi custom command sono stati <b>fusi nelle skill</b>: <code>.claude/commands/deploy.md</code> e <code>.claude/skills/deploy/SKILL.md</code> creano entrambi <code>/deploy</code> (vol. 11).</p>
+
+<table class="ref">
+  <tr><th style="width:14%;">Livello</th><th style="width:44%;">Path</th><th>Vale per</th></tr>
+  <tr><td class="kw">Personal</td><td><code>~/.claude/skills/&lt;nome&gt;/SKILL.md</code></td><td>Tutti i tuoi progetti</td></tr>
+  <tr><td class="kw">Project</td><td><code>.claude/skills/&lt;nome&gt;/SKILL.md</code></td><td>Solo quel progetto (committalo: lo usa il team)</td></tr>
+  <tr><td class="kw">Plugin</td><td><code>&lt;plugin&gt;/skills/&lt;nome&gt;/SKILL.md</code></td><td>Dove il plugin è abilitato, come <code>/plugin:nome</code></td></tr>
+  <tr><td class="kw">Enterprise</td><td>managed settings</td><td>Tutta l'organizzazione (vince sugli altri)</td></tr>
+</table>
+<p class="body-p small">Le directory sono <b>osservate</b>: skill nuove o modificate valgono subito, senza riavvio. A parità di nome: enterprise &gt; personal &gt; project, e una skill tua sostituisce quella bundled omonima.</p>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Esempio 1: il riassunto del diff <span class="tag">contesto dinamico con !`comando`</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># ~/.claude/skills/summarize-changes/SKILL.md</span>
+---
+description: Riassume le modifiche non committate
+  e segnala i rischi. Usala quando l'utente chiede
+  cosa è cambiato, vuole un commit message o una
+  review del suo diff.
+---
+
+## Modifiche correnti
+
+!`git diff HEAD`
+
+## Istruzioni
+
+Riassumi le modifiche qui sopra in due o tre punti,
+poi elenca i rischi che noti: error handling
+mancante, valori hardcoded, test da aggiornare.
+Se il diff è vuoto, dì che non ci sono modifiche.</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>Perché funziona</h4>
+      <ul>
+        <li>La riga <code>!`git diff HEAD`</code> è <b>dynamic context injection</b>: Claude Code esegue il comando <i>prima</i> che Claude legga la skill e sostituisce la riga con l'output — Claude riceve il diff reale, non il comando. Multi-riga: blocco recintato aperto con <code>```!</code>.</li>
+        <li>La <code>description</code> contiene le frasi che diresti davvero ("cosa è cambiato", "commit message"): è ciò su cui Claude matcha per l'invocazione automatica.</li>
+      </ul>
+    </div>
+    <div class="notebox">
+      <h4>Provala in 2 modi</h4>
+      <p>Modifica un file qualsiasi e chiedi <i>"Cosa ho cambiato?"</i> (invocazione automatica) oppure digita <span class="kbd">/summarize-changes</span> (diretta). Stessa skill, due inneschi.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Esempio 2: conoscenza che si carica da sola <span class="tag">user-invocable: false + paths</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/skills/api-conventions/SKILL.md</span>
+---
+name: api-conventions
+description: Pattern di design API di questo
+  repo. Si applica quando si scrivono o
+  modificano endpoint.
+user-invocable: false
+paths:
+  - "src/api/**"
+---
+
+Quando scrivi endpoint API:
+- Naming RESTful delle risorse
+- Formato errori consistente
+- Validazione delle richieste in ingresso</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Il pattern "reference content"</h4>
+      <ul>
+        <li>È conoscenza di fondo, non un'azione: <code>user-invocable: false</code> la nasconde dal menu <code>/</code> — solo Claude la invoca, quando serve.</li>
+        <li><code>paths</code> limita l'attivazione automatica ai file che matchano i glob: le convenzioni API non inquinano il contesto mentre lavori sul CSS.</li>
+        <li>Alternativa a CLAUDE.md: quando una sezione di CLAUDE.md è diventata una <i>procedura</i> più che un fatto, spostala in una skill — si paga solo quando si usa. E tieni il corpo asciutto: una volta invocata <b>resta in contesto</b> per tutta la sessione.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Esempio 3: la skill con lo script dentro <span class="tag">supporting files + ${CLAUDE_SKILL_DIR}</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># ~/.claude/skills/codebase-visualizer/
+#   &#9500;&#9472; SKILL.md
+#   &#9492;&#9472; scripts/visualize.py</span>
+---
+name: codebase-visualizer
+description: Genera una vista ad albero
+  interattiva del codebase. Usala per esplorare
+  un repo nuovo o trovare i file grossi.
+allowed-tools: Bash(python3 *)
+---
+
+Esegui lo script dalla root del progetto:
+
+```bash
+python3 ${CLAUDE_SKILL_DIR}/scripts/visualize.py .
+```
+
+Crea `codebase-map.html` e lo apre nel browser.</pre>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>Il pattern "script bundled"</h4>
+      <ul>
+        <li>Lo script fa il lavoro pesante, Claude orchestra. Funziona per qualsiasi output visuale: grafi di dipendenze, coverage, schemi DB.</li>
+        <li><code>${CLAUDE_SKILL_DIR}</code> si espande nella directory della skill: il path dello script è giusto ovunque sia installata.</li>
+        <li><code>allowed-tools: Bash(python3 *)</code> pre-approva solo ciò che serve; tutto il resto segue i permessi normali.</li>
+        <li>Altri file utili: <code>reference.md</code>, <code>examples/</code>, template — citali da SKILL.md così Claude sa quando aprirli. SKILL.md sotto le 500 righe.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>Il frontmatter che conta <span class="tag">tutto opzionale, description raccomandata</span></h2>
+
+<table class="ref">
+  <tr><th style="width:30%;">Campo</th><th>Effetto</th></tr>
+  <tr><td class="k">description / when_to_use</td><td>Come Claude decide se caricarla da solo. Caso d'uso chiave all'inizio: in listing il testo combinato è troncato a 1.536 caratteri.</td></tr>
+  <tr><td class="k">disable-model-invocation / user-invocable</td><td>Il primo a <code>true</code> = solo tu (deploy, commit — decidi tu il momento); il secondo a <code>false</code> = solo Claude (conoscenza di fondo, via dal menu <code>/</code>).</td></tr>
+  <tr><td class="k">allowed-tools / disallowed-tools</td><td>Pre-approva tool mentre la skill è attiva / li toglie dal pool (fino al tuo prossimo messaggio).</td></tr>
+  <tr><td class="k">argument-hint / arguments</td><td>Hint in autocomplete (es. <code>[issue-number]</code>) / nomi per gli argomenti posizionali (vol. 11).</td></tr>
+  <tr><td class="k">context: fork &nbsp;+&nbsp; agent</td><td>Esegue la skill in un subagente isolato; <code>agent</code> sceglie quale (es. <code>Explore</code>). Solo per skill con un compito esplicito.</td></tr>
+  <tr><td class="k">model / effort / paths / hooks</td><td>Override di modello o effort per il turno / glob che limitano l'attivazione automatica / hook scoped alla skill.</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; Se qualcosa non va</h3>
+  <p><b>Non si attiva?</b> Metti nella description le parole che l'utente direbbe davvero; con troppe skill il listing viene accorciato — <span class="kbd">/doctor</span> dice quali description sono tagliate. YAML rotto = skill senza metadata: <code>/nome</code> funziona, l'auto-invocazione no. <b>Si attiva troppo?</b> Description più specifica o <code>disable-model-invocation: true</code>. Per misurarla sul serio: <code>/plugin install skill-creator@claude-plugins-official</code> fa eval A/B con e senza skill.</p>
+</div>
+
+<div class="footer-note">Fonti: code.claude.com/docs — skills (getting started, frontmatter reference, advanced patterns, troubleshooting) · Standard aperto: agentskills.io</div>
+</body></html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: MCP in practice</span>
+
+<div class="hero">
+  <h1>MCP in practice <span class="accent">&#8644;</span></h1>
+  <div class="sub">Three real integrations step by step: Sentry for production debugging, GitHub for issues and PRs, the read-only database. Plus @ resources, /mcp__ prompts and the server dedicated to a subagent.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 12 (extra) of the series — theory and security in vol. 7.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>Example 1: Sentry — production errors in chat <span class="tag">remote HTTP + OAuth</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># 1. add the remote server</span>
+claude mcp add --transport http sentry \
+  https://mcp.sentry.dev/mcp
+
+<span class="cm"># 2. in session: authenticate in the browser</span>
+/mcp
+
+<span class="cm"># 3. then ask, in plain English</span>
+"What are the most common errors
+ in the last 24 hours?"
+"Show me the stack trace for error abc123"
+"Which deployment introduced
+ these new errors?"</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>The OAuth flow, once only</h4>
+      <ul>
+        <li>The server responds 401/403 &#8594; <span class="kbd">/mcp</span> marks it "needs authentication": pick the server, the browser opens, log in and go. Tokens are stored and <b>refreshed on their own</b>; "Clear authentication" in the menu revokes.</li>
+        <li>From the terminal: <code>claude mcp login sentry</code>; over SSH add <code>--no-browser</code> and open the printed URL on your machine.</li>
+        <li>If a refresh fails, Claude Code points you straight to <span class="kbd">/mcp</span> &#8594; "Re-authenticate" (v2.1.195+): no tool calls dying silently.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Example 2: GitHub — issues and PRs without switching windows <span class="tag">HTTP + token in the header</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># fine-grained token from
+# github.com/settings/personal-access-tokens
+# with access to only the repos you need</span>
+claude mcp add --transport http github \
+  https://api.githubcopilot.com/mcp/ \
+  --header "Authorization: Bearer YOUR_PAT"
+
+<span class="cm"># then:</span>
+"Review PR #456 and suggest
+ improvements"
+"Open an issue for the bug we
+ just found"
+"Show me the open PRs assigned to me"</pre>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>The token rules</h4>
+      <ul>
+        <li><b>Static auth in the header</b> (no OAuth): the fine-grained PAT limits the blast radius to the chosen repos. If the server rejects the configured header, the connection shows as failed — Claude Code does <i>not</i> fall back to OAuth: check the token or remove the header.</li>
+        <li>Watch the scope: the command above saves to <code>local</code> (default, only you, only that project). The token does <b>not</b> belong in <code>--scope project</code> / <code>.mcp.json</code>, which ends up in git.</li>
+        <li>Granular tool permissions: <code>mcp__github__get_*</code> in allow, or <code>mcp__github</code> in deny to switch off the whole server (vol. 7).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Example 3: the queryable database <span class="tag">local stdio + read-only DSN</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># stdio server: runs on your machine;
+# the -- separates Claude's flags from the command</span>
+claude mcp add --transport stdio db -- \
+  npx -y @bytebase/dbhub \
+  --dsn "postgresql://readonly:pass@prod.db.com:5432/analytics"
+
+<span class="cm"># then query in natural language:</span>
+"What is the total revenue this month?"
+"Show me the schema of the orders table"
+"Find customers with no purchases in 90 days"</pre>
+  </div>
+  <div>
+    <div class="notebox red">
+      <h4>The security lives in the DSN</h4>
+      <p>The real security measure is the <code>readonly</code> user <b>in the database</b>: whatever Claude asks, the DB rejects writes. Defense in depth: the same philosophy as the hook that filters SELECTs in vol. 10 — there at the subagent level, here at the credentials level. For credentials use <code>--env</code> or keep them out of a shared <code>.mcp.json</code>.</p>
+    </div>
+    <div class="notebox">
+      <h4>Remember (vol. 7)</h4>
+      <ul>
+        <li>Servers in a freshly cloned <code>.mcp.json</code> stay pending approval; reset with <code>claude mcp reset-project-choices</code>.</li>
+        <li>Status and tool count: <span class="kbd">/mcp</span>; from the shell <code>claude mcp list / get / remove</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Beyond tools: @ resources and / prompts <span class="tag">the server as source and as command</span></h2>
+
+<div class="duo">
+  <div>
+    <div class="notebox plum">
+      <h4>Resources: @server:protocol://path</h4>
+      <ul>
+        <li>Type <code>@</code> and the connected servers' resources appear alongside files, with fuzzy search.</li>
+        <li><i>"Analyze <code>@github:issue://123</code> and propose a fix"</i></li>
+        <li>Multiple resources in the same prompt: <i>"Compare <code>@postgres:schema://users</code> with <code>@docs:file://database/user-model</code>"</i></li>
+        <li>The resource is fetched and attached on its own: no copy-paste.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>Server prompts: /mcp__server__prompt</h4>
+      <ul>
+        <li>Prompts exposed by a server become commands: type <code>/</code> and they appear as <code>/mcp__servername__promptname</code>.</li>
+        <li>Without arguments: <span class="kbd">/mcp__github__list_prs</span></li>
+        <li>With arguments, separated by spaces: <span class="kbd">/mcp__github__pr_review 456</span> · <span class="kbd">/mcp__jira__create_issue "Bug login" high</span></li>
+        <li>Discovered dynamically from connected servers; the result is injected into the conversation.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>The server of a single subagent <span class="tag">bridge to vol. 10</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/agents/browser-tester.md
+# the server exists only while
+# the subagent is working</span>
+---
+name: browser-tester
+description: Tests features in a real
+  browser with Playwright.
+mcpServers:
+  - playwright:
+      type: stdio
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+---</pre>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>When it pays off</h4>
+      <ul>
+        <li>Server used only by one specific flow? Define it <b>inline in the subagent</b>, not in <code>.mcp.json</code>: the main agent doesn't pay for the tool definitions in context and the server starts/stops with the worker.</li>
+        <li>Tool search (on by default) keeps tool-heavy servers light anyway: only the names enter context until a tool is needed. For the few tools you <i>always</i> need: <code>"alwaysLoad": true</code> on the server in <code>.mcp.json</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; Checklist before connecting</h3>
+  <p><b>1.</b> Is the server in the Anthropic Directory (claude.ai/directory), or have you inspected it? Servers that fetch external content expose you to prompt injection. <b>2.</b> Credentials in the right place: <code>local</code> scope or <code>--env</code>, never tokens in a committed <code>.mcp.json</code>. <b>3.</b> Least privilege: fine-grained PATs, read-only DB users, <code>mcp__server__tool</code> rules in permissions. <b>4.</b> Connect at session start: adding servers mid-session invalidates the prompt cache (vol. 3).</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — mcp (practical examples, authenticate, resources, prompts, tool search) · Theory, transports and scopes: vol. 7 · Subagents: vol. 10.</div>
+</body></html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Extra: subagents in practice</span>
+
+<div class="hero">
+  <h1>Subagents in practice <span class="accent">&#9881;</span></h1>
+  <div class="sub">Three complete subagents to copy: the read-only code reviewer, the database reader that cannot write, the tester with a browser of its own.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 10 (extra) of the series — theory in vol. 2.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>The anatomy in 60 seconds <span class="tag">one markdown file, the body is the system prompt</span></h2>
+
+<p class="body-p">A subagent is a markdown file with YAML frontmatter: only <code>name</code> and <code>description</code> are required, the <b>body becomes its system prompt</b>. It runs in a context of its own: it doesn't see your conversation and returns only the result — the verbose output stays with it. Since v2.1.198 <span class="kbd">/agents</span> no longer opens the wizard: <b>ask Claude to write the file</b> or create it by hand; the directories are watched, new or modified file = active within seconds.</p>
+
+<table class="ref">
+  <tr><th style="width:26%;">Where</th><th style="width:22%;">Applies to</th><th>Priority on name conflict</th></tr>
+  <tr><td class="k">managed settings</td><td>Organization</td><td>1 (wins over everything)</td></tr>
+  <tr><td class="k">--agents '&lt;json&gt;'</td><td>That session only</td><td>2 — for quick tests and scripts, no file on disk</td></tr>
+  <tr><td class="k">.claude/agents/</td><td>The project</td><td>3 — commit it: the team uses and improves it</td></tr>
+  <tr><td class="k">~/.claude/agents/</td><td>All your projects</td><td>4</td></tr>
+  <tr><td class="k">&lt;plugin&gt;/agents/</td><td>Where the plugin is active</td><td>5 (scoped name <code>plugin:name</code>)</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Example 1: the code reviewer <span class="tag">read-only by construction</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/agents/code-reviewer.md</span>
+---
+name: code-reviewer
+description: Expert review of quality, security
+  and maintainability. Use it proactively right
+  after writing or modifying code.
+tools: Read, Grep, Glob, Bash
+model: inherit
+---
+
+You are a senior code reviewer. When invoked:
+1. Run git diff to see the recent changes
+2. Focus on the modified files, start right away
+
+Checklist: clear code; meaningful names; no
+duplication; error handling; no exposed
+secrets; validated inputs; adequate tests.
+
+Feedback by priority: critical / warnings /
+suggestions, with examples of how to fix.</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>The choices that matter</h4>
+      <ul>
+        <li><code>tools</code> is an <b>allowlist</b>: without Edit and Write the reviewer cannot touch the code, by construction (the alternative <code>disallowedTools</code> inherits everything except those).</li>
+        <li>"<b>Use it proactively</b>" in the description pushes Claude to delegate on its own; the body sets workflow and output format — vague subagents return vague results.</li>
+      </ul>
+    </div>
+    <div class="notebox">
+      <h4>Three ways to invoke it</h4>
+      <ul>
+        <li>Natural: <i>"use the code-reviewer subagent on my latest changes"</i> — Claude decides.</li>
+        <li><b>@-mention</b>: type <code>@agent-code-reviewer</code> — guarantees that exact agent runs.</li>
+        <li>Whole session: <code>claude --agent code-reviewer</code> — the entire session with its prompt, tools and model.</li>
+        <li>Bonus: with <code>memory: project</code> the reviewer <b>learns across sessions</b> (<code>.claude/agent-memory/</code>, shareable via git).</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">3.</span>Example 2: Bash yes, but SELECT only <span class="tag">when tools isn't enough: PreToolUse hook</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/agents/db-reader.md</span>
+---
+name: db-reader
+description: Runs read-only queries on the database.
+  Use it for data analysis and reports.
+tools: Bash
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: "./scripts/validate-readonly-query.sh"
+---
+
+You are an analyst with read-only access.
+Answer with efficient SELECT queries. If
+asked to modify data, explain that you
+only have read access.</pre>
+  </div>
+  <div>
+<pre class="code"><span class="cm"># scripts/validate-readonly-query.sh
+# (chmod +x) — blocks SQL writes</span>
+#!/bin/bash
+INPUT=$(cat)
+COMMAND=$(echo "$INPUT" | jq -r \
+  '.tool_input.command // empty')
+
+if echo "$COMMAND" | grep -iE \
+  '\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE)\b' \
+  > /dev/null; then
+  echo "Blocked: SELECT queries only" >&2
+  exit 2
+fi
+exit 0</pre>
+    <div class="notebox red">
+      <h4>The mechanism</h4>
+      <p>The <code>tools</code> field is all-or-nothing: here you need Bash, but <i>only certain</i> commands. The <code>PreToolUse</code> hook receives the call as JSON on stdin before it runs: <code>exit 2</code> blocks it, the stderr goes back to Claude. Determinism, not hope (vol. 2).</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">4.</span>Example 3: a browser of its own <span class="tag">inline mcpServers</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># .claude/agents/browser-tester.md</span>
+---
+name: browser-tester
+description: Tests features in a real
+  browser with Playwright.
+mcpServers:
+  # inline: exists only for this subagent
+  - playwright:
+      type: stdio
+      command: npx
+      args: ["-y", "@playwright/mcp@latest"]
+  - github   # by name: reuses a server already
+---          # configured in the session
+
+Use the Playwright tools to navigate, take
+screenshots and interact with pages.</pre>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>Why inline</h4>
+      <ul>
+        <li>The server starts with the subagent and shuts down when it finishes: <b>the main never sees those tools</b> nor pays for their definitions.</li>
+        <li>Inline entries use the same schema as <code>.mcp.json</code>; by-name references (<code>- github</code>) reuse the parent session's connection.</li>
+        <li>To remove them instead: <code>disallowedTools: mcp__github</code> (that whole server) or <code>mcp__*</code> (all MCPs).</li>
+      </ul>
+    </div>
+    <div class="notebox">
+      <h4>Foreground, background, resume</h4>
+      <ul>
+        <li>Since v2.1.198 they run in the <b>background by default</b>; permissions still surface to you. <span class="kbd">Ctrl+B</span> = background a running task.</li>
+        <li>Each invocation starts from scratch; to continue: <i>"continue that review, now authorization"</i> — resumes the same subagent with all its history.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">5.</span>Frontmatter reference <span class="tag">only name and description required</span></h2>
+
+<table class="ref">
+  <tr><th style="width:30%;">Field</th><th>Effect</th></tr>
+  <tr><td class="k">tools / disallowedTools</td><td>Tool allowlist / denylist; MCP patterns at server level (<code>mcp__github</code>). Together: deny first, then allow on the rest.</td></tr>
+  <tr><td class="k">model / effort</td><td><code>sonnet</code>, <code>opus</code>, <code>haiku</code>, <code>fable</code>, full ID or <code>inherit</code> (default). Effort: <code>low</code>&#8230;<code>max</code>.</td></tr>
+  <tr><td class="k">permissionMode</td><td><code>default</code> / <code>acceptEdits</code> / <code>auto</code> / <code>dontAsk</code> / <code>bypassPermissions</code> / <code>plan</code>; in bypass/acceptEdits/auto the parent wins.</td></tr>
+  <tr><td class="k">skills / memory</td><td>Skills <b>preloaded</b> in full at startup / persistent memory across sessions (<code>user</code>/<code>project</code>/<code>local</code> in <code>agent-memory/</code>; <code>project</code> recommended).</td></tr>
+  <tr><td class="k">isolation: worktree</td><td>Temporary git worktree: isolated copy of the repo, cleaned up if untouched.</td></tr>
+  <tr><td class="k">background / maxTurns / color / hooks / mcpServers</td><td>Always in background / turn cap / color in the transcript / dedicated hooks and MCP servers (ex. 3 and 4; ignored in plugin subagents).</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; The three patterns that pay off immediately</h3>
+  <p><b>1. Isolate the verbose:</b> <i>"use a subagent for the tests and report only the failures"</i>. <b>2. Parallel research:</b> <i>"explore auth, database and API in parallel with separate subagents"</i>. <b>3. Chain:</b> <i>"code-reviewer finds the issues, then the optimizer fixes them"</i>. Golden rule: subagent when the work is self-contained and comes back as a summary; main conversation for the back-and-forth; <span class="kbd">/btw</span> for a quick question.</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — sub-agents · Ecosystem: vol. 2 (skills/hooks), vol. 6 (parallel).</div>
+</body></html>
