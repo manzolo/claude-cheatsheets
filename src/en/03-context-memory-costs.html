@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Context, memory and costs</span>
+
+<div class="hero">
+  <h1>Context, memory and costs <span class="accent">&#9670;</span></h1>
+  <div class="sub">How the context window really works, how the cache behaves, where memory lives, and how not to burn through tokens and plan limits.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 3 of the Claude Code cheatsheet series.</div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">1.</span>The context window and the cache <span class="tag">why some actions cost and others don't</span></h2>
+
+<p class="body-p">The model remembers nothing between requests: on every message you send, Claude Code re-sends <b>everything</b> — system prompt, project context, the entire conversation, the new message. <b>Prompt caching</b> is what avoids reprocessing the identical part: the API compares the start of the request (the <i>prefix</i>) with what it has processed recently. The match is <b>exact</b>: a change anywhere in the prefix recomputes everything that follows. That's why Claude Code orders the request with the rarely-changing parts first:</p>
+
+<table class="ref">
+  <tr><th style="width:20%;">Layer</th><th style="width:42%;">Contents</th><th>Changes when...</th></tr>
+  <tr><td><b>System prompt</b></td><td>Core instructions, tool definitions, output style</td><td>An MCP connects/disconnects, or Claude Code gets updated</td></tr>
+  <tr><td><b>Project context</b></td><td>CLAUDE.md, auto memory, non-scoped rules</td><td>Session start, or after /clear and /compact</td></tr>
+  <tr><td><b>Conversation</b></td><td>Messages, responses, tool results</td><td>Every turn (it <b>appends</b> at the end: the cache holds)</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox red">
+      <h4>&#10007; Actions that invalidate the cache (slow, expensive turn)</h4>
+      <ul>
+        <li><b>Switching models</b> (/model): each model has its own cache; the next request re-reads the whole history with no hits. Note: <code>opusplan</code> switches models on every plan mode toggle.</li>
+        <li><b>An MCP connecting/disconnecting</b> mid-session (even on its own: stdio process exiting, expired HTTP session, automatic reconnection).</li>
+        <li><b>Denying an entire tool</b> (bare rule like <code>Bash</code>): removes the tool from context. Scoped denies like <code>Bash(rm *)</code> don't touch the cache.</li>
+        <li><b>/compact</b>: by design replaces the history with a summary (but the summarization request reuses the cache: the real cost is the generation, not the miss).</li>
+        <li><b>Updating Claude Code</b>: changes the system prompt. Resuming a long session after an upgrade reprocesses the whole history: it can be the most expensive request you send.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>&#10003; Actions that preserve it</h4>
+      <ul>
+        <li><b>Editing repo files</b>: contents only enter the context when Claude reads them; the edit is flagged with an appended reminder.</li>
+        <li><b>Editing CLAUDE.md mid-session</b>: the cache holds... but <b>the change doesn't apply</b>! The file is read once at startup; the new content arrives at the next /clear, /compact or restart. Same for the output style.</li>
+        <li><b>Invoking skills and commands</b>: they inject instructions as appended messages.</li>
+        <li><b>Switching permission mode</b> (Shift+Tab) and <b>changing effort</b>: cache-safe.</li>
+        <li><b>/rewind</b>: truncates to a prefix <b>already in cache</b> — if you've gone down the wrong path, rewinding costs less than compacting.</li>
+        <li><b>Subagents</b>: they work in a separate window; yours stays intact.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; The practical rule</h3>
+  <p>Pick your model and connect MCP servers <b>at the start of the session</b>, then leave them alone. Save <code>/compact</code> for natural pauses between tasks (with instructions: <code>/compact keep the error handling patterns</code>) instead of waiting for auto-compaction mid-work. Fewer mid-task changes = more cache hits = a faster, cheaper session. Check what's filling the window with <code>/context</code>.</p>
+</div>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>CLAUDE.md, rules and auto memory <span class="tag">the project's persistent memory</span></h2>
+
+<p class="body-p">Every session starts from scratch; two mechanisms carry knowledge across sessions, both loaded at startup. Caution: they are <b>context, not forcibly applied configuration</b> — to block an action regardless of what Claude decides, you need a PreToolUse hook or a permission rule.</p>
+
+<table class="ref">
+  <tr><th style="width:24%;"></th><th style="width:38%;">CLAUDE.md</th><th>Auto memory</th></tr>
+  <tr><td><b>Who writes it</b></td><td>You</td><td>Claude (learns from corrections and preferences)</td></tr>
+  <tr><td><b>Contents</b></td><td>Instructions and rules</td><td>Learnings and discovered patterns</td></tr>
+  <tr><td><b>Scope</b></td><td>Project, user or organization</td><td>Per repository, shared across worktrees</td></tr>
+  <tr><td><b>Loading</b></td><td>Every session, in full</td><td>Every session (first 200 lines or 25KB)</td></tr>
+  <tr><td><b>Use for</b></td><td>Conventions, build commands, architecture</td><td>Debug insights, discovered commands, preferences</td></tr>
+</table>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Where CLAUDE.md files live (in loading order)</h3>
+<table class="ref">
+  <tr><th style="width:22%;">Scope</th><th style="width:40%;">Location</th><th>What for</th></tr>
+  <tr><td><b>Managed (org)</b></td><td class="k">/etc/claude-code/CLAUDE.md (Linux)</td><td>Company standards via MDM/Ansible; individuals can't opt out</td></tr>
+  <tr><td><b>User</b></td><td class="k">~/.claude/CLAUDE.md</td><td>Personal preferences across all projects</td></tr>
+  <tr><td><b>Project</b></td><td class="k">./CLAUDE.md &nbsp;or&nbsp; ./.claude/CLAUDE.md</td><td>Shared with the team via git</td></tr>
+  <tr><td><b>Local</b></td><td class="k">./CLAUDE.local.md</td><td>Personal per-project preferences; add it to .gitignore</td></tr>
+</table>
+<p class="body-p small">Claude Code <b>walks up the directory tree</b> from the working directory collecting every CLAUDE.md; contents are <b>concatenated</b> (root downward, so the ones closest to you are read last). Those in subdirectories load on demand when Claude touches files there. In a monorepo, <code>claudeMdExcludes</code> skips other teams' files. HTML comments <code>&lt;!-- --&gt;</code> are stripped before injection: maintainer notes at zero token cost.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox green">
+      <h4>Writing effective instructions</h4>
+      <ul>
+        <li><b>Under 200 lines</b>: longer files consume context and reduce adherence.</li>
+        <li><b>Specific and verifiable</b>: "use 2-space indentation", not "format nicely"; "run npm test before committing", not "test your changes".</li>
+        <li><b>Consistent</b>: two conflicting rules = Claude picks one at random. Review periodically.</li>
+        <li><b>Imports</b> with <code>@path/to/file</code> (up to 4 levels deep; inside backticks it stays literal text). <code>@AGENTS.md</code> at the top reuses instructions from other agent tools.</li>
+        <li>Add a line when Claude gets the same thing wrong <b>twice</b> — multi-step procedures belong in a skill instead.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>.claude/rules/ — modular instructions</h4>
+      <p>One markdown file per topic (<code>testing.md</code>, <code>security.md</code>...), discovered recursively, even via symlinks shared across projects. The superpower is the <code>paths</code> frontmatter:</p>
+<pre class="code">---
+<span class="key">paths:</span>
+  - <span class="str">"src/api/**/*.ts"</span>
+---
+# API rules
+- Every endpoint validates input
+- Standard error format</pre>
+      <p>Rules with <code>paths</code> load <b>only when Claude works on matching files</b>: clean context and tokens saved. User rules in <code>~/.claude/rules/</code> apply everywhere (lower priority than project rules).</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">3.</span>Cutting token usage <span class="tag">the levers, most effective first</span></h2>
+
+<table class="ref">
+  <tr><th style="width:30%;">Strategy</th><th>How</th></tr>
+  <tr><td><b>Clean up between tasks</b></td><td><code>/clear</code> when switching to unrelated work: stale context costs on <b>every</b> subsequent message. Run <code>/rename</code> first, so you can find the session again with /resume.</td></tr>
+  <tr><td><b>Right model for the task</b></td><td>Sonnet handles most coding well and costs less than Opus; save Opus for architecture and multi-step reasoning. For simple subagents: <code>model: haiku</code>.</td></tr>
+  <tr><td><b>Effort and thinking</b></td><td>Extended thinking is billed as output and the default budget can be worth tens of thousands of tokens per request: for simple tasks lower it with <code>/effort</code> or turn thinking off in /config.</td></tr>
+  <tr><td><b>Subagents for the noise</b></td><td>Tests, logs, documentation fetches: delegate them to a subagent; only the summary comes back to main.</td></tr>
+  <tr><td><b>CLI &gt; MCP where possible</b></td><td><code>gh</code>, <code>aws</code>, <code>gcloud</code>, <code>sentry-cli</code> add no tool definitions to the context. Disable unused servers from /mcp; MCP definitions are deferred by default anyway (tool search).</td></tr>
+  <tr><td><b>Preprocessing hooks</b></td><td>Instead of having Claude read 10,000 lines of logs, a hook filters with grep and returns only the ERROR lines: from tens of thousands of tokens down to hundreds.</td></tr>
+  <tr><td><b>From CLAUDE.md to skills</b></td><td>Workflow-specific instructions (PR reviews, DB migrations) loaded every session are wasted tokens whenever you're doing something else: move them into on-demand skills.</td></tr>
+  <tr><td><b>Specific prompts</b></td><td>"Improve this codebase" triggers broad scans; "add input validation to the login function in auth.ts" works with minimal reads.</td></tr>
+  <tr><td><b>Plan mode and early corrections</b></td><td>Shift+Tab to plan before implementing; if Claude heads the wrong way, <b>Esc immediately</b> and /rewind: rework is the most avoidable expense.</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox blue">
+      <h4>What it costs, in practice</h4>
+      <p>On enterprise API deployments the average is ~$13 per developer per active day ($150-250/month), with 90% of users under $30/day. On subscription (Pro/Max) the dollar figure in /usage is informational only: what matters are the plan-limit bars, with breakdowns per skill, subagents, plugins and MCP servers (keys <span class="kbd">d</span>/<span class="kbd">w</span> for 24h/7d). There's also a small background spend (&lt;$0.04/session) for summaries and status commands.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Watch out for agent teams</h4>
+      <p>Each teammate is a full Claude instance with its own window: in plan mode consumption reaches ~7&times; a normal session. If you use them: Sonnet for teammates, small teams, lean spawn prompts, and shut teammates down when they're done.</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — prompt-caching, memory, costs, context-window · /context and /usage are your everyday diagnostic tools.</div>
+</body></html>

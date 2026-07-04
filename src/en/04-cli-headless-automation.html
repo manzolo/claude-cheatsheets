@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · CLI, headless and automation</span>
+
+<div class="hero">
+  <h1>CLI, headless and automation <span class="accent">&#9670;</span></h1>
+  <div class="sub">Claude as a scriptable tool: commands and launch flags, non-interactive mode (-p), structured output, cron, CI/CD and cloud routines.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 4 of the Claude Code cheatsheet series.</div>
+</div>
+
+<h2 class="chapter ch-f"><span class="num">1.</span>CLI commands <span class="tag">what you type before entering a session</span></h2>
+
+<table class="ref">
+  <tr><th style="width:38%;">Command</th><th>What it does</th></tr>
+  <tr><td class="k">claude &nbsp;/&nbsp; claude "query"</td><td>Interactive session, with an optional initial prompt.</td></tr>
+  <tr><td class="k">claude -p "query"</td><td><b>Non-interactive</b>: runs and exits. The foundation of all scripting (see ch. 3).</td></tr>
+  <tr><td class="k">claude -c &nbsp;/&nbsp; claude -r "id" "query"</td><td>Continues the latest conversation in the directory / resumes by ID or name.</td></tr>
+  <tr><td class="k">claude agents</td><td>Opens the <b>agent view</b>: dispatch and monitoring of background sessions. <code>--json</code> for scripting, <code>--cwd &lt;path&gt;</code> to filter by project.</td></tr>
+  <tr><td class="k">claude attach / logs / stop / respawn / rm &lt;id&gt;</td><td>Manage background sessions from the shell: attach, print recent output, stop, restart with the conversation intact, remove from the list.</td></tr>
+  <tr><td class="k">claude mcp add|list|get|remove</td><td>Configure MCP servers; <code>claude mcp login &lt;name&gt;</code> runs the OAuth flow without opening the panel (with <code>--no-browser</code> for SSH).</td></tr>
+  <tr><td class="k">claude plugin install ...</td><td>Plugin management from the CLI (e.g. <code>claude plugin install code-review@claude-plugins-official</code>).</td></tr>
+  <tr><td class="k">claude setup-token</td><td>Generates a <b>long-lived OAuth token for CI and scripts</b> (requires a subscription). Prints it without saving it.</td></tr>
+  <tr><td class="k">claude project purge [path]</td><td>Deletes a project's local state: transcripts, debug logs, history. <code>--dry-run</code> for a preview.</td></tr>
+  <tr><td class="k">claude update &nbsp;/&nbsp; claude install stable</td><td>Updates / installs a specific version of the native binary.</td></tr>
+  <tr><td class="k">claude auth login|logout|status</td><td>Authentication; <code>status</code> exits with 0 if logged in, 1 if not (handy in scripts).</td></tr>
+</table>
+
+<h2 class="chapter ch-c"><span class="num">2.</span>The flags that matter <span class="tag">claude --help doesn't list them all</span></h2>
+
+<table class="ref">
+  <tr><th style="width:36%;">Flag</th><th>Effect</th></tr>
+  <tr><td class="k">--model / --permission-mode / --effort</td><td>Model, permission mode and reasoning effort for the session.</td></tr>
+  <tr><td class="k">--allowedTools "..."</td><td>Tools pre-approved without prompts, using rule syntax: <code>"Bash(git diff *)" "Read"</code>. To <i>restrict</i> the available tools, use <code>--tools</code> instead.</td></tr>
+  <tr><td class="k">--add-dir &lt;path&gt;...</td><td>Additional working directories (file access; the .claude/ config there is not discovered, with the exception of skills).</td></tr>
+  <tr><td class="k">--agents '&lt;json&gt;'</td><td>Subagents defined on the fly in JSON, for the session only: perfect for scripts and tests.</td></tr>
+  <tr><td class="k">--append-system-prompt "..."</td><td>Appends text to the default system prompt (also from a file with <code>--append-system-prompt-file</code>); <code>--system-prompt</code> replaces it entirely.</td></tr>
+  <tr><td class="k">--bare</td><td><b>Minimal mode</b>: skips hooks, skills, plugins, MCP, auto memory and CLAUDE.md. Faster startup and, above all, <b>reproducible</b>: same result on every machine. Recommended for scripts and CI (will become the default for -p).</td></tr>
+  <tr><td class="k">--bg / --background</td><td>Launches as a <b>background agent</b> and returns immediately, printing the ID and management commands.</td></tr>
+  <tr><td class="k">--output-format text|json|stream-json</td><td>Output format in -p (see below).</td></tr>
+  <tr><td class="k">--settings / --mcp-config / --plugin-dir</td><td>Inject explicit configuration (file or JSON): the way to give a --bare run exactly what it needs.</td></tr>
+  <tr><td class="k">--dangerously-skip-permissions</td><td>No permission prompts. Only in isolated environments (container/VM); the <code>--allow-...</code> variant adds the mode to the Shift+Tab cycle without starting in it.</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">3.</span>Headless: claude -p <span class="tag">Claude as a unix command</span></h2>
+
+<p class="body-p"><code>-p</code> also reads <b>stdin</b> (up to 10MB) and writes to stdout: it slots into pipes like any other tool. Invocable skills work here too: include <code>/skill-name</code> in the prompt string and it gets expanded before execution.</p>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># Pipe: explain a build error</span>
+cat build-error.txt | claude -p \
+  'concisely explain the cause' > out.txt
+
+<span class="cm"># Custom linter in package.json</span>
+"lint:claude": "git diff main | claude -p
+  \"you are a typo linter. for each typo:
+  file:line and issue. nothing else.\""
+
+<span class="cm"># Automatic commit with targeted permissions</span>
+claude -p "create an appropriate commit
+  from the staged changes" \
+  --allowedTools "Bash(git diff *),
+  Bash(git status *),Bash(git commit *)"
+
+<span class="cm"># Reproducible CI: bare mode</span>
+claude --bare -p "summarize this file" \
+  --allowedTools "Read"</pre>
+  </div>
+  <div>
+<pre class="code"><span class="cm"># JSON output with metadata and costs</span>
+claude -p "summarize the project" \
+  --output-format json | jq -r '.result'
+<span class="cm"># the payload includes total_cost_usd</span>
+
+<span class="cm"># Output conforming to a schema</span>
+claude -p "extract the function names
+  from auth.py" --output-format json \
+  --json-schema '{"type":"object",
+   "properties":{"functions":{"type":
+   "array","items":{"type":"string"}}},
+   "required":["functions"]}' \
+  | jq '.structured_output'
+
+<span class="cm"># Token-by-token streaming</span>
+claude -p "explain recursion" \
+  --output-format stream-json --verbose \
+  --include-partial-messages</pre>
+  </div>
+</div>
+
+<div class="notebox blue">
+  <h4>The right pattern for scripts: --bare + explicit flags</h4>
+  <p>Without --bare, <code>claude -p</code> loads the same context as an interactive session: a hook in a colleague's ~/.claude or an MCP in the project's .mcp.json would also run in CI. With --bare you start clean (Bash + file read/write) and add only what's explicit: <code>--append-system-prompt(-file)</code> for instructions, <code>--settings</code>, <code>--mcp-config</code>, <code>--agents</code>, <code>--plugin-dir</code>. Authentication in bare mode comes from <code>ANTHROPIC_API_KEY</code> (no keychain); in CI with a subscription, use the token from <code>claude setup-token</code>. For permission baselines: <code>--permission-mode dontAsk</code> denies everything not pre-approved (locked-down CI), <code>acceptEdits</code> lets it write files without prompts.</p>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">4.</span>Recurring automation <span class="tag">cron, routines and CI</span></h2>
+
+<div class="duo">
+  <div>
+    <div class="notebox">
+      <h4>Local cron (sysadmin style)</h4>
+<pre class="code"><span class="cm"># crontab: daily report at 7am</span>
+0 7 * * * cd /srv/repo &amp;&amp; claude --bare -p \
+ "check yesterday's logs in /var/log/app,
+  summarize errors and anomalies in
+  /srv/reports/\$(date +\%F).md" \
+ --allowedTools "Read,Write,Bash(grep *)" \
+ --output-format json >> /var/log/claude-cron.log</pre>
+      <p>Inside an open session, the equivalent is <code>/loop [interval] [prompt]</code> (e.g. <i>/loop 5m check whether the deploy has finished</i>).</p>
+    </div>
+    <div class="notebox">
+      <h4>Cloud routines: /schedule</h4>
+      <p><b>Routines</b> run on Anthropic-managed infrastructure: on a schedule, via API or in reaction to GitHub events — without keeping anything of yours running. Create them conversationally with <code>/schedule</code> (alias /routines); requires GitHub connected via <code>/web-setup</code>.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>CI/CD</h4>
+      <ul>
+        <li><b>GitHub Actions</b>: <code>/install-github-app</code> sets up the app, workflow and secrets; from there Claude responds to @claude in PRs/issues and can run automatic reviews. A <b>GitLab CI/CD</b> equivalent exists.</li>
+        <li><b>/autofix-pr</b>: a cloud session that watches the branch's PR and pushes fixes when CI fails or comments come in.</li>
+        <li>In generic pipelines: <code>claude --bare -p</code> + <code>--output-format json</code>; with stream-json the <code>system/init</code> event lists the loaded plugins (useful for failing CI if a plugin doesn't load) and <code>system/api_retry</code> reports retries.</li>
+      </ul>
+    </div>
+    <div class="notebox">
+      <h4>Details that save hours</h4>
+      <ul>
+        <li>With -p, background Bash processes are killed ~5s after the final result; background subagents are awaited instead (10-minute cap by default).</li>
+        <li>Prefer piping the diff over granting Bash permission: <code>git diff | claude -p ...</code> requires no allowedTools at all.</li>
+        <li><code>Bash(git diff *)</code>: the space before * is significant — without it, it also matches <code>git diff-index</code>.</li>
+        <li>For the full SDK (Python/TypeScript, structured outputs, programmatic approvals): the Claude Agent SDK package, the same engine as Claude Code as a library.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — cli-reference, headless, github-actions, routines · claude --help doesn't list all the flags: the online reference does.</div>
+</body></html>

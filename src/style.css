@@ -1,0 +1,110 @@
+@page {
+  size: A4;
+  margin: 13mm 12mm 15mm 12mm;
+  @bottom-center {
+    content: string(doctitle) " — pag. " counter(page) " di " counter(pages);
+    font-family: "DejaVu Sans", sans-serif;
+    font-size: 7pt;
+    color: #9a938c;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "DejaVu Sans", sans-serif; font-size: 8.4pt; color: #2b2620; line-height: 1.4; }
+.doctitle { string-set: doctitle content(); display: block; font-size: 0; height: 0; overflow: hidden; }
+
+.hero { background: #1f1b16; color: #f5efe7; border-radius: 10px; padding: 16px 20px 14px 20px; margin-bottom: 10px; }
+.hero h1 { font-size: 19pt; font-weight: 800; letter-spacing: -0.5px; }
+.hero h1 .accent { color: #d97757; }
+.hero .sub { margin-top: 4px; font-size: 8.6pt; color: #c9c0b4; }
+.hero .meta { margin-top: 8px; font-size: 7.2pt; color: #8f877c; }
+
+code, .cmd, .kbd, pre { font-family: "DejaVu Sans Mono", monospace; }
+p code, li code, td code {
+  background: #efe6d9; border-radius: 3px; padding: 0 3px;
+  font-size: 7.5pt; color: #a04d2e;
+}
+
+h2.chapter {
+  font-size: 13pt; font-weight: 800; color: #fff;
+  padding: 7px 14px; border-radius: 8px; margin: 13px 0 8px 0;
+  letter-spacing: -0.2px;
+}
+h2 .num { opacity: 0.55; font-weight: 400; margin-right: 6px; }
+h2 .tag { float: right; font-size: 7.5pt; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+.ch-a { background: #d97757; }
+.ch-b { background: #4a7856; }
+.ch-c { background: #3d5a80; }
+.ch-d { background: #8a4f7d; }
+.ch-e { background: #b3752c; }
+.ch-f { background: #56707e; }
+.ch-g { background: #8c3b3b; }
+
+h3.sub-h {
+  font-size: 10pt; font-weight: 800; color: #1f1b16;
+  margin: 10px 0 4px 0; padding-bottom: 2px;
+  border-bottom: 2px solid #e8dfd2;
+}
+h3.sub-h .dot { color: #d97757; }
+
+p.body-p { margin-bottom: 6px; color: #3c362e; }
+p.body-p b { color: #1f1b16; }
+p.small { font-size: 7.6pt; }
+
+table.ref { width: 100%; border-collapse: collapse; margin: 4px 0 8px 0; }
+table.ref th {
+  background: #2b2620; color: #f0e8dc; font-size: 7.4pt;
+  text-align: left; padding: 4px 8px; font-weight: 700;
+}
+table.ref td { padding: 4px 8px; border-bottom: 1px solid #f1ebe1; vertical-align: top; font-size: 7.8pt; color: #443e35; }
+table.ref tr:nth-child(even) td { background: #fbf8f3; }
+table.ref td b { color: #1f1b16; }
+table.ref td.k { white-space: nowrap; font-family: "DejaVu Sans Mono", monospace; font-weight: 700; font-size: 7.4pt; color: #1f1b16; }
+table.ref td.kw { font-family: "DejaVu Sans Mono", monospace; font-weight: 700; font-size: 7.4pt; color: #1f1b16; }
+
+pre.code {
+  background: #2b2620; color: #e8ddc9; font-size: 7pt;
+  border-radius: 6px; padding: 8px 10px; margin: 5px 0 8px 0;
+  line-height: 1.5; white-space: pre-wrap;
+}
+pre.code .cm { color: #8f877c; }
+pre.code .key { color: #f0b393; }
+pre.code .str { color: #a8c8a0; }
+pre.code .hl { color: #e8b04a; }
+
+.duo { display: table; width: 100%; border-spacing: 8px 0; margin: 0 -8px 8px -8px; }
+.duo > div { display: table-cell; width: 50%; vertical-align: top; }
+
+.notebox {
+  background: #faf5ee; border: 1px solid #e8dfd2; border-left: 4px solid #d97757;
+  border-radius: 6px; padding: 8px 12px; margin-bottom: 8px;
+  page-break-inside: avoid;
+}
+.notebox.green { border-left-color: #4a7856; }
+.notebox.blue  { border-left-color: #3d5a80; }
+.notebox.plum  { border-left-color: #8a4f7d; }
+.notebox.red   { border-left-color: #8c3b3b; background: #faf0ee; }
+.notebox h4 { font-size: 8.6pt; color: #1f1b16; margin-bottom: 3px; }
+.notebox p, .notebox li { font-size: 7.7pt; color: #4c463d; }
+.notebox ul, .notebox ol { margin-left: 13px; }
+.notebox li { margin-bottom: 2px; }
+
+.kbd {
+  background: #efe6d9; border: 1px solid #ddd0bd; border-bottom-width: 2px;
+  border-radius: 3px; padding: 0 3px; font-size: 6.9pt; color: #4c463d;
+}
+
+.avoid-break { page-break-inside: avoid; }
+
+.flowbox {
+  background: #1f1b16; color: #ede5d8; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 10px; page-break-inside: avoid;
+}
+.flowbox h3 { font-size: 9.5pt; color: #d97757; margin-bottom: 5px; }
+.flowbox p, .flowbox li { font-size: 7.8pt; color: #ede5d8; }
+.flowbox ul, .flowbox ol { margin-left: 14px; }
+.flowbox li { margin-bottom: 2.5px; }
+.flowbox td { color: #ede5d8 !important; background: transparent !important; border-bottom: 1px solid #3a342c !important; }
+.flowbox td b { color: #f0b393 !important; }
+.flowbox table.ref th { background: #35302a; }
+.flowbox code { background: #35302a; color: #f0b393; padding: 0 4px; border-radius: 3px; font-size: 7.2pt; }
+.footer-note { font-size: 7pt; color: #8f877c; text-align: center; margin-top: 6px; }

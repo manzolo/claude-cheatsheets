@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude.ai · The app beyond code</span>
+
+<div class="hero">
+  <h1>Claude.ai: the app beyond code <span class="accent">&#9670;</span></h1>
+  <div class="sub">Projects, artifacts, memory, Research, skills and connectors: Claude's features on web, mobile and desktop for work that isn't (only) code.</div>
+  <div class="meta">Updated: July 2026 · Sources: support.claude.com and public material · Vol. 8 of the cheatsheet series · Features evolve fast and vary by plan: the up-to-date truth lives in the Help Center.</div>
+</div>
+
+<h2 class="chapter ch-a"><span class="num">1.</span>The product family <span class="tag">same Claude, different surfaces</span></h2>
+
+<table class="ref">
+  <tr><th style="width:20%;">Product</th><th style="width:44%;">What it is</th><th>When to use it</th></tr>
+  <tr><td><b>Chat</b> (web / mobile / desktop)</td><td>The conversational interface: every chat starts clean (plus memory), you steer step by step.</td><td>Questions, brainstorming, writing, document analysis.</td></tr>
+  <tr><td><b>Claude Cowork</b></td><td>The desktop agent for knowledge work: accesses a folder you grant it, reads/edits/creates files autonomously, runs multi-step tasks, coordinates subagents, and can use Claude in Chrome/Excel/PowerPoint as tools.</td><td>Delegating work on files (reports, reorganizations, paperwork), not conversing.</td></tr>
+  <tr><td><b>Claude Code</b></td><td>The developer tool: terminal, IDE, desktop and browser (the star of volumes 1-7 of this series).</td><td>Anything involving code and repositories.</td></tr>
+  <tr><td><b>Integrations</b></td><td>Claude in Chrome (browsing agent), in Excel (spreadsheets with cell-level citations), in PowerPoint (slides); the API and Claude Platform for building on top.</td><td>Bringing Claude into the tools you already use.</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>Projects <span class="tag">the context wall between one job and another</span></h2>
+
+<p class="body-p">A Project is a dedicated workspace that keeps together <b>uploaded files + custom instructions + chat history</b> for one topic, without context bleeding across different jobs. Every new chat inside the project automatically sees those documents and follows those instructions: upload the style guide, reports or knowledge base once, and stop re-explaining from scratch.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox green">
+      <h4>How to use them well</h4>
+      <ul>
+        <li>One project per client / topic / workflow: the separation is the value.</li>
+        <li><b>Project instructions</b> apply to every chat inside: tone, format, constraints, terminology.</li>
+        <li>For large document bases, the project uses retrieval (RAG): Claude pulls the relevant passages instead of always loading everything.</li>
+        <li>On Team/Enterprise, projects can be shared, with use/edit permissions.</li>
+        <li>Projects can be imported into Cowork, where they gain local file access, scheduled tasks and connectors.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>Projects vs Memory (they complement each other)</h4>
+      <p><b>Memory</b> handles who you are: preferences, role, background context that applies everywhere. <b>Projects</b> handle the files and instructions of one specific body of work. Together: Claude knows how you work <i>and</i> what you're working on, without you having to repeat it.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">3.</span>Artifacts <span class="tag">living outputs, not blocks of text</span></h2>
+
+<p class="body-p">An artifact is <b>self-contained, reusable</b> content that appears in a side panel: documents, React components, HTML pages, SVGs, diagrams, small working apps. You iterate on them ("make the chart interactive", "change the palette"), edit them precisely, and editing an earlier message creates an <b>alternative version</b> of the conversation with its own artifacts — you explore different directions without losing work.</p>
+
+<div class="notebox">
+  <h4>AI-powered artifacts ("an app in a prompt")</h4>
+  <p>An artifact can <b>call Claude from inside itself</b> via a text API: adaptive quizzes, personalized coaches, games, generators. You describe the app, Claude writes the code, the app runs on Anthropic's infrastructure. When you <b>share</b> it, users authenticate with their own account and usage counts <b>against their limits, not yours</b>: whether 10 or 10,000 people use it, it's free for you. Artifacts also support persistent storage and connections to MCP servers. If something breaks, the "Try fixing with Claude" button copies the error into a message for diagnosis.</p>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">4.</span>Memory and chat search <span class="tag">Claude that remembers you</span></h2>
+
+<table class="ref">
+  <tr><th style="width:34%;">Feature</th><th>What it does</th></tr>
+  <tr><td><b>Generate memory from chat history</b></td><td>Claude automatically extracts and saves important context from your chats: role, preferences, ongoing projects. Toggle in Settings &rarr; Capabilities.</td></tr>
+  <tr><td><b>Search and reference past chats</b></td><td>Claude can pull relevant details from your history into the current conversation ("what was that server I was fixing called?").</td></tr>
+  <tr><td><b>Control</b></td><td>View, edit, export and import what's saved from the settings; you can ask directly in chat to remember or forget something. <b>Incognito</b> conversations never touch memory.</td></tr>
+</table>
+<p class="body-p small">Practical tip: open Settings &rarr; Memory and read what's written there. Fix what's inaccurate, add useful context: the more accurate the profile, the less you repeat yourself.</p>
+
+<h2 class="chapter ch-d"><span class="num">5.</span>Web, Research and thinking <span class="tag">three gears for three kinds of questions</span></h2>
+
+<table class="ref">
+  <tr><th style="width:26%;">Tool</th><th style="width:44%;">What it does</th><th>For which questions</th></tr>
+  <tr><td><b>Web search</b></td><td>Real-time searches with inline citations.</td><td>Current facts, prices, news, "who is currently the...".</td></tr>
+  <tr><td><b>Research</b></td><td><b>Agentic</b> research: many searches, source reading, cross-referencing with your Workspace and connected integrations, structured report with citations.</td><td>Substantive multi-source questions: market analysis, state of the art, due diligence.</td></tr>
+  <tr><td><b>Extended thinking</b></td><td>Extended reasoning before answering.</td><td>Complex problems, math, planning, trade-offs.</td></tr>
+</table>
+
+<h2 class="chapter ch-f"><span class="num">6.</span>Skills, connectors and the directory <span class="tag">extending the app too</span></h2>
+
+<div class="duo">
+  <div>
+    <div class="notebox blue">
+      <h4>Skills here too</h4>
+      <p>Skills (packaged instructions, same concept as vol. 2) also exist in claude.ai: ready-made sets for specific tasks — sales, marketing, legal, finance — plus your own custom ones. Claude applies them when needed, for output consistent with the way you work.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Connectors (remote MCP)</h4>
+      <p>Connectors link Claude to external services — Google Drive, Gmail, Calendar, Notion, Asana and many more — via remote MCP: Claude reads and acts on those systems with your consent. Browse them in the <b>directory</b> (claude.ai/directory) alongside skills and plugins. On desktop you can also add local MCP servers. Same golden rule as Claude Code: only connect what you trust.</p>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; The recommended 15-minute setup</h3>
+  <ol>
+    <li>Settings &rarr; <b>Memory</b>: enable both toggles, read and correct your profile.</li>
+    <li>Create a <b>Project</b> for your main line of work: upload 3-5 key documents, write 5 lines of instructions (tone, format, constraints).</li>
+    <li>Connect 1-2 <b>connectors</b> you actually use (e.g. Drive and Calendar).</li>
+    <li>Enable <b>web search</b> and try <b>Research</b> on a real question from your work.</li>
+    <li>Ask for an <b>artifact</b> instead of a block of text next time you need something reusable: a document, a dashboard, a small tool.</li>
+  </ol>
+</div>
+
+<div class="footer-note">Sources: support.claude.com (Help Center) and public Anthropic material · Availability and limits vary by plan (Free/Pro/Max/Team/Enterprise): check the Help Center.</div>
+</body></html>

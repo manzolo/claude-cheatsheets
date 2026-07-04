@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Contesto, memoria e costi</span>
+
+<div class="hero">
+  <h1>Contesto, memoria e costi <span class="accent">&#9670;</span></h1>
+  <div class="sub">Come funziona davvero la finestra di contesto, come si comporta la cache, dove vive la memoria e come non bruciare token e limiti di piano.</div>
+  <div class="meta">Aggiornato: luglio 2026 · Fonte: documentazione ufficiale Anthropic (code.claude.com/docs) · Vol. 3 della serie bignami Claude Code.</div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">1.</span>La finestra di contesto e la cache <span class="tag">perché certe azioni costano e altre no</span></h2>
+
+<p class="body-p">Il modello non ricorda nulla tra una richiesta e l'altra: a ogni tuo messaggio Claude Code ri-invia <b>tutto</b> — system prompt, contesto di progetto, l'intera conversazione, il messaggio nuovo. Il <b>prompt caching</b> è ciò che evita di rielaborare la parte identica: l'API confronta l'inizio della richiesta (il <i>prefisso</i>) con quanto già processato di recente. Il match è <b>esatto</b>: una modifica in un punto qualsiasi del prefisso ricalcola tutto ciò che viene dopo. Per questo Claude Code ordina la richiesta mettendo prima ciò che cambia raramente:</p>
+
+<table class="ref">
+  <tr><th style="width:20%;">Layer</th><th style="width:42%;">Contenuto</th><th>Cambia quando...</th></tr>
+  <tr><td><b>System prompt</b></td><td>Istruzioni core, definizioni dei tool, output style</td><td>Un MCP si connette/disconnette, o Claude Code viene aggiornato</td></tr>
+  <tr><td><b>Contesto progetto</b></td><td>CLAUDE.md, auto memory, regole non scoped</td><td>Avvio sessione, o dopo /clear e /compact</td></tr>
+  <tr><td><b>Conversazione</b></td><td>Messaggi, risposte, risultati dei tool</td><td>Ogni turno (si <b>appende</b> in coda: la cache regge)</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox red">
+      <h4>&#10007; Azioni che invalidano la cache (turno lento e costoso)</h4>
+      <ul>
+        <li><b>Cambiare modello</b> (/model): ogni modello ha la sua cache; la richiesta successiva rilegge tutta la history senza hit. Nota: <code>opusplan</code> cambia modello a ogni toggle del plan mode.</li>
+        <li><b>MCP che si connette/disconnette</b> a metà sessione (anche da solo: processo stdio che esce, sessione HTTP scaduta, riconnessione automatica).</li>
+        <li><b>Deny di un intero tool</b> (regola nuda tipo <code>Bash</code>): rimuove il tool dal contesto. Le deny scoped come <code>Bash(rm *)</code> invece non toccano la cache.</li>
+        <li><b>/compact</b>: per design sostituisce la history con un riassunto (ma la richiesta di riassunto riusa la cache: il costo vero è la generazione, non il miss).</li>
+        <li><b>Aggiornare Claude Code</b>: cambia il system prompt. Riprendere una sessione lunga dopo un upgrade rielabora tutta la history: può essere la richiesta più costosa che mandi.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>&#10003; Azioni che la preservano</h4>
+      <ul>
+        <li><b>Modificare file del repo</b>: i contenuti entrano solo quando Claude li legge; l'edit viene segnalato con un reminder appeso.</li>
+        <li><b>Modificare CLAUDE.md a metà sessione</b>: la cache regge... ma <b>la modifica non si applica</b>! Il file è letto una volta all'avvio; il nuovo contenuto arriva al prossimo /clear, /compact o riavvio. Stessa cosa per l'output style.</li>
+        <li><b>Invocare skill e comandi</b>: iniettano istruzioni come messaggi in coda.</li>
+        <li><b>Cambiare permission mode</b> (Shift+Tab) e <b>cambiare effort</b>: cache-safe.</li>
+        <li><b>/rewind</b>: tronca a un prefisso <b>già in cache</b> — se hai preso una strada sbagliata, riavvolgere costa meno che compattare.</li>
+        <li><b>Subagenti</b>: lavorano in una finestra separata, la tua resta intatta.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; La regola pratica</h3>
+  <p>Scegli il modello e connetti i server MCP <b>a inizio sessione</b>, poi non toccarli più. Riserva <code>/compact</code> alle pause naturali tra un task e l'altro (con istruzioni: <code>/compact mantieni i pattern di error handling</code>) invece di aspettare l'auto-compattazione a metà lavoro. Meno cambi a metà task = più cache hit = sessione più veloce ed economica. Controlla cosa riempie la finestra con <code>/context</code>.</p>
+</div>
+
+<h2 class="chapter ch-b"><span class="num">2.</span>CLAUDE.md, regole e auto memory <span class="tag">la memoria persistente del progetto</span></h2>
+
+<p class="body-p">Ogni sessione parte da zero; due meccanismi portano conoscenza tra le sessioni, entrambi caricati all'avvio. Attenzione: sono <b>contesto, non configurazione applicata a forza</b> — per bloccare un'azione a prescindere da cosa decide Claude serve un hook PreToolUse o una regola di permesso.</p>
+
+<table class="ref">
+  <tr><th style="width:24%;"></th><th style="width:38%;">CLAUDE.md</th><th>Auto memory</th></tr>
+  <tr><td><b>Chi scrive</b></td><td>Tu</td><td>Claude (impara da correzioni e preferenze)</td></tr>
+  <tr><td><b>Contenuto</b></td><td>Istruzioni e regole</td><td>Apprendimenti e pattern scoperti</td></tr>
+  <tr><td><b>Scope</b></td><td>Progetto, utente o organizzazione</td><td>Per repository, condivisa tra i worktree</td></tr>
+  <tr><td><b>Caricamento</b></td><td>Ogni sessione, per intero</td><td>Ogni sessione (prime 200 righe o 25KB)</td></tr>
+  <tr><td><b>Usa per</b></td><td>Convenzioni, comandi di build, architettura</td><td>Insight di debug, comandi scoperti, preferenze</td></tr>
+</table>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Dove vivono i CLAUDE.md (in ordine di caricamento)</h3>
+<table class="ref">
+  <tr><th style="width:22%;">Scope</th><th style="width:40%;">Posizione</th><th>Per cosa</th></tr>
+  <tr><td><b>Managed (org)</b></td><td class="k">/etc/claude-code/CLAUDE.md (Linux)</td><td>Standard aziendali via MDM/Ansible; non escludibile dai singoli</td></tr>
+  <tr><td><b>Utente</b></td><td class="k">~/.claude/CLAUDE.md</td><td>Preferenze personali per tutti i progetti</td></tr>
+  <tr><td><b>Progetto</b></td><td class="k">./CLAUDE.md &nbsp;o&nbsp; ./.claude/CLAUDE.md</td><td>Condiviso col team via git</td></tr>
+  <tr><td><b>Locale</b></td><td class="k">./CLAUDE.local.md</td><td>Preferenze personali di progetto; mettilo in .gitignore</td></tr>
+</table>
+<p class="body-p small">Claude Code <b>risale l'albero delle directory</b> dalla working directory raccogliendo tutti i CLAUDE.md; i contenuti si <b>concatenano</b> (dalla radice verso il basso, quindi i più vicini a te vengono letti per ultimi). Quelli nelle sottodirectory si caricano on demand quando Claude tocca file lì dentro. In un monorepo, <code>claudeMdExcludes</code> salta i file di altri team. I commenti HTML <code>&lt;!-- --&gt;</code> vengono strippati prima dell'iniezione: note per i manutentori a costo zero di token.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox green">
+      <h4>Scrivere istruzioni efficaci</h4>
+      <ul>
+        <li><b>Sotto le 200 righe</b>: file più lunghi consumano contesto e riducono l'aderenza.</li>
+        <li><b>Specifico e verificabile</b>: "usa indentazione a 2 spazi", non "formatta bene"; "lancia npm test prima di committare", non "testa le modifiche".</li>
+        <li><b>Coerente</b>: due regole in conflitto = Claude ne sceglie una a caso. Rivedi periodicamente.</li>
+        <li><b>Import</b> con <code>@path/to/file</code> (fino a 4 livelli; dentro i backtick resta testo letterale). <code>@AGENTS.md</code> in cima riusa le istruzioni di altri agent tool.</li>
+        <li>Aggiungi una riga quando Claude sbaglia la stessa cosa <b>due volte</b> — le procedure multi-step vanno invece in una skill.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>.claude/rules/ — istruzioni modulari</h4>
+      <p>File markdown per argomento (<code>testing.md</code>, <code>security.md</code>...), scoperti ricorsivamente, anche via symlink condivisi tra progetti. Il superpotere è il frontmatter <code>paths</code>:</p>
+<pre class="code">---
+<span class="key">paths:</span>
+  - <span class="str">"src/api/**/*.ts"</span>
+---
+# Regole API
+- Ogni endpoint valida l'input
+- Formato errori standard</pre>
+      <p>Le regole con <code>paths</code> si caricano <b>solo quando Claude lavora su file corrispondenti</b>: contesto pulito e token risparmiati. Regole utente in <code>~/.claude/rules/</code> valgono ovunque (priorità più bassa delle regole di progetto).</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">3.</span>Ridurre i token <span class="tag">le leve, dalla più efficace in giù</span></h2>
+
+<table class="ref">
+  <tr><th style="width:30%;">Strategia</th><th>Come</th></tr>
+  <tr><td><b>Pulisci tra i task</b></td><td><code>/clear</code> quando passi a lavoro non correlato: il contesto stantio costa su <b>ogni</b> messaggio successivo. Prima fai <code>/rename</code>, così ritrovi la sessione con /resume.</td></tr>
+  <tr><td><b>Modello giusto per il task</b></td><td>Sonnet regge bene la maggior parte del coding e costa meno di Opus; riserva Opus ad architettura e ragionamento multi-step. Per i subagenti semplici: <code>model: haiku</code>.</td></tr>
+  <tr><td><b>Effort e thinking</b></td><td>L'extended thinking è fatturato come output e il budget di default può valere decine di migliaia di token a richiesta: per task semplici abbassa con <code>/effort</code> o disattiva il thinking in /config.</td></tr>
+  <tr><td><b>Subagenti per il rumore</b></td><td>Test, log, fetch di documentazione: delegali a un subagente, in main torna solo il sunto.</td></tr>
+  <tr><td><b>CLI &gt; MCP dove possibile</b></td><td><code>gh</code>, <code>aws</code>, <code>gcloud</code>, <code>sentry-cli</code> non aggiungono definizioni di tool al contesto. Disabilita da /mcp i server che non usi; le definizioni MCP sono comunque deferite di default (tool search).</td></tr>
+  <tr><td><b>Hook di preprocessing</b></td><td>Invece di far leggere a Claude 10.000 righe di log, un hook filtra con grep e restituisce solo le righe con ERROR: da decine di migliaia di token a centinaia.</td></tr>
+  <tr><td><b>Da CLAUDE.md a skill</b></td><td>Le istruzioni di workflow specifici (review PR, migrazioni DB) caricate a ogni sessione sono token sprecati quando fai altro: spostale in skill on-demand.</td></tr>
+  <tr><td><b>Prompt specifici</b></td><td>"Migliora questo codebase" scatena scansioni ampie; "aggiungi validazione input alla funzione login in auth.ts" lavora con letture minime.</td></tr>
+  <tr><td><b>Plan mode e correzioni precoci</b></td><td>Shift+Tab per pianificare prima di implementare; se Claude sbaglia strada, <b>Esc subito</b> e /rewind: il rework è la spesa più evitabile.</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox blue">
+      <h4>Quanto costa, in pratica</h4>
+      <p>Su deployment enterprise via API la media è ~13$ per sviluppatore per giorno attivo (150-250$/mese), con il 90% degli utenti sotto i 30$/giorno. Su abbonamento (Pro/Max) il costo in dollari di /usage è solo informativo: contano le barre dei limiti di piano, con breakdown per skill, subagenti, plugin e server MCP (tasti <span class="kbd">d</span>/<span class="kbd">w</span> per 24h/7gg). Esiste anche un piccolo consumo di fondo (&lt;0,04$/sessione) per riassunti e comandi di stato.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Occhio agli agent team</h4>
+      <p>Ogni teammate è un'istanza Claude completa con la sua finestra: in plan mode il consumo arriva a ~7&times; una sessione normale. Se li usi: Sonnet per i teammate, team piccoli, prompt di spawn asciutti, e spegni i teammate quando hanno finito.</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">Fonti: code.claude.com/docs — prompt-caching, memory, costs, context-window · /context e /usage sono i tuoi strumenti diagnostici quotidiani.</div>
+</body></html>

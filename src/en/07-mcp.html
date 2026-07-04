@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · MCP done right</span>
+
+<div class="hero">
+  <h1>MCP done right <span class="accent">&#9670;</span></h1>
+  <div class="sub">Connecting Claude Code to databases, issue trackers, APIs and external services with the Model Context Protocol: transports, scopes, OAuth, timeouts and security.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 7 of the Claude Code cheatsheet series.</div>
+</div>
+
+<h2 class="chapter ch-d"><span class="num">1.</span>What it is and what it's for <span class="tag">stop copy-pasting data into the chat</span></h2>
+
+<p class="body-p">MCP (Model Context Protocol) is the open-source standard for AI&harr;tool integrations. An MCP server gives Claude the <b>tools and data</b> of an external system: the sign you need one is catching yourself pasting content from another window into the chat — issue tracker, monitoring dashboard, database. Once connected, Claude reads and acts directly. Real-world examples: "implement the feature from JIRA issue ENG-4521 and open a PR on GitHub", "check feature usage in Sentry", "find the emails of 10 users who used it in PostgreSQL", "update the email template from the new Figma designs".</p>
+
+<div class="notebox red">
+  <h4>Rule number one: trust first, then connect</h4>
+  <p>An MCP server is code (or a service) with access to your session. Servers that fetch external content expose you to <b>prompt injection</b> risk. Start with the reviewed connectors in the <b>Anthropic Directory</b> (claude.ai/directory) and inspect community ones before adding them. In an enterprise, admins can enforce server allowlists/denylists via managed configuration.</p>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">2.</span>Installing servers <span class="tag">three transports, one crucial double dash</span></h2>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># remote HTTP (recommended for cloud services)</span>
+claude mcp add --transport http notion \
+  https://mcp.notion.com/mcp
+
+<span class="cm"># with a Bearer token</span>
+claude mcp add --transport http secure-api \
+  https://api.example.com/mcp \
+  --header "Authorization: Bearer TOKEN"
+
+<span class="cm"># local stdio (processes on your machine)</span>
+claude mcp add --env AIRTABLE_API_KEY=KEY \
+  --transport stdio airtable \
+  -- npx -y airtable-mcp-server
+
+<span class="cm"># SSE: deprecated, use HTTP where possible
+# WebSocket (servers that push events):
+# via add-json with "type":"ws"</span></pre>
+    <div class="notebox plum">
+      <h4>The <code>--</code> is not decorative</h4>
+      <p>For stdio servers, the double dash separates Claude's options (<code>--transport</code>, <code>--env</code>, <code>--scope</code>) from the server command: everything after it passes through untouched. Without it, Claude Code would try to interpret the server's flags (like <code>--port</code>) as its own.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>Day-to-day management</h4>
+      <ul>
+        <li><span class="kbd">claude mcp list / get / remove</span> from the shell; <span class="kbd">/mcp</span> in-session shows status, tool counts and manages <b>OAuth</b> for remote servers.</li>
+        <li><span class="kbd">claude mcp login &lt;name&gt;</span> runs OAuth from the CLI; <code>--no-browser</code> over SSH prints the URL to open elsewhere.</li>
+        <li>Automatic reconnection for HTTP/SSE with exponential backoff (5 attempts); stdio servers are local processes and are not reconnected.</li>
+        <li>Servers can hot-update their own tools (<code>list_changed</code> notifications).</li>
+        <li><b>Channels</b>: a server can also <i>push</i> messages into the session (CI results, alerts, chat) so Claude reacts while you're away — opt-in with <code>--channels</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Scopes: where the configuration lives</h3>
+<table class="ref">
+  <tr><th style="width:14%;">Scope</th><th style="width:26%;">Loads in</th><th style="width:22%;">Shared with the team</th><th>Stored in</th></tr>
+  <tr><td class="kw">local</td><td>Current project only</td><td>No (default)</td><td><code>~/.claude.json</code>, under the project path</td></tr>
+  <tr><td class="kw">project</td><td>Current project only</td><td><b>Yes, via git</b></td><td><code>.mcp.json</code> in the repo root</td></tr>
+  <tr><td class="kw">user</td><td>All your projects</td><td>No</td><td><code>~/.claude.json</code></td></tr>
+</table>
+<p class="body-p small">Chosen with <code>--scope</code>. Servers from the <code>.mcp.json</code> of a freshly cloned repo stay <b>pending approval</b> until you trust the workspace: a repository cannot self-approve its own servers. Use <code>local</code> for credentials that must not end up in version control, <code>project</code> for the team standard, <code>user</code> for your cross-project tools.</p>
+
+<h2 class="chapter ch-e"><span class="num">3.</span>Operations: timeouts, context, permissions <span class="tag">the details that make the difference</span></h2>
+
+<table class="ref">
+  <tr><th style="width:34%;">Knob</th><th>Effect</th></tr>
+  <tr><td class="k">MCP_TIMEOUT=10000 claude</td><td>Server startup timeout (ms).</td></tr>
+  <tr><td class="k">"timeout": 600000 &nbsp;(in .mcp.json)</td><td>Wall-clock limit <b>per individual tool call</b> for that server (min 1000 ms); overrides MCP_TOOL_TIMEOUT.</td></tr>
+  <tr><td class="k">MAX_MCP_OUTPUT_TOKENS=50000</td><td>Raises the threshold above which an MCP tool's output triggers a warning (default 10,000 tokens).</td></tr>
+  <tr><td class="k">CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT</td><td>Calls to remote servers that stay silent for 5 minutes get aborted; this changes the window (0 = disable).</td></tr>
+  <tr><td class="k">Tool search (on by default)</td><td>MCP tool definitions are <b>deferred</b>: only the names enter the context until a tool is actually needed. This is what makes servers with dozens of tools sustainable. The set of names must still stay stable to avoid invalidating the cache.</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox">
+      <h4>MCP in permissions and subagents</h4>
+      <ul>
+        <li>Canonical tool name: <code>mcp__&lt;server&gt;__&lt;tool&gt;</code> (for plugin servers: <code>mcp__plugin_&lt;plugin&gt;_&lt;server&gt;__&lt;tool&gt;</code>).</li>
+        <li>Rules: <code>mcp__github</code> in deny removes every tool of that server; <code>mcp__*</code> all MCP tools. Allow globs only after the literal server prefix: <code>mcp__github__get_*</code>.</li>
+        <li>In subagents: the <code>mcpServers</code> field gives a worker a specific server (by already-configured name or inline definition); <code>disallowedTools: mcp__github</code> takes it away.</li>
+        <li>Connect MCP servers <b>at session start</b>: mid-session connects/disconnects invalidate the prompt cache (vol. 3).</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>Building your own</h4>
+      <p>The official plugin scaffolds most of it:</p>
+<pre class="code">/plugin marketplace add \
+  anthropics/claude-plugins-official
+/plugin install \
+  mcp-server-dev@claude-plugins-official
+/mcp-server-dev:build-mcp-server</pre>
+      <p>Claude asks about your use case and generates a remote HTTP or local stdio server. For stdio servers, Claude Code sets <code>CLAUDE_PROJECT_DIR</code> in the process environment: resolve project paths without depending on the working directory. Finally, plugins can <b>bundle</b> MCP servers: they connect on their own when the plugin is enabled — the cleanest way to distribute them to a team.</p>
+    </div>
+  </div>
+</div>
+
+<div class="flowbox">
+  <h3>&#9654; MCP + skills: the winning pair</h3>
+  <p>MCP gives Claude the <b>tools</b> (the database connection, the Slack API); a skill teaches it to <b>use them well</b> (your DB schema and the team's query patterns, the message formatting rules). Tools without usage knowledge = guesswork; knowledge without tools = theory. Together, ideally bundled in a plugin, they become the integration that installs in one command.</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — mcp, mcp-quickstart, managed-mcp, channels · Connector directory: claude.ai/directory · Standard: modelcontextprotocol.io</div>
+</body></html>

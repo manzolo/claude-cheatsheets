@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 13mm 12mm 15mm 12mm;
+    @bottom-center {
+      content: "Claude Code · Extending Claude: Skills, Subagents, Hooks & Plugins — page " counter(page) " of " counter(pages);
+      font-family: "DejaVu Sans", sans-serif;
+      font-size: 7pt;
+      color: #9a938c;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "DejaVu Sans", sans-serif; font-size: 8.4pt; color: #2b2620; line-height: 1.4; }
+
+  .hero { background: #1f1b16; color: #f5efe7; border-radius: 10px; padding: 16px 20px 14px 20px; margin-bottom: 10px; }
+  .hero h1 { font-size: 19pt; font-weight: 800; letter-spacing: -0.5px; }
+  .hero h1 .accent { color: #d97757; }
+  .hero .sub { margin-top: 4px; font-size: 8.6pt; color: #c9c0b4; }
+  .hero .meta { margin-top: 8px; font-size: 7.2pt; color: #8f877c; }
+
+  code, .cmd, .kbd, pre { font-family: "DejaVu Sans Mono", monospace; }
+  p code, li code, td code {
+    background: #efe6d9; border-radius: 3px; padding: 0 3px;
+    font-size: 7.5pt; color: #a04d2e;
+  }
+
+  h2.chapter {
+    font-size: 14pt; font-weight: 800; color: #fff;
+    padding: 7px 14px; border-radius: 8px; margin: 14px 0 8px 0;
+    letter-spacing: -0.2px;
+  }
+  h2 .num { opacity: 0.55; font-weight: 400; margin-right: 6px; }
+  h2 .tag { float: right; font-size: 7.5pt; font-weight: 400; opacity: 0.85; margin-top: 5px; }
+  .ch-skills   { background: #4a7856; }
+  .ch-agents   { background: #3d5a80; }
+  .ch-hooks    { background: #8a4f7d; }
+  .ch-plugins  { background: #b3752c; }
+  .ch-map      { background: #d97757; }
+
+  h3.sub-h {
+    font-size: 10pt; font-weight: 800; color: #1f1b16;
+    margin: 10px 0 4px 0; padding-bottom: 2px;
+    border-bottom: 2px solid #e8dfd2;
+  }
+  h3.sub-h .dot { color: #d97757; }
+
+  p.body-p { margin-bottom: 6px; color: #3c362e; }
+  p.body-p b { color: #1f1b16; }
+
+  table.ref { width: 100%; border-collapse: collapse; margin: 4px 0 8px 0; }
+  table.ref th {
+    background: #2b2620; color: #f0e8dc; font-size: 7.4pt;
+    text-align: left; padding: 4px 8px; font-weight: 700;
+  }
+  table.ref td { padding: 4px 8px; border-bottom: 1px solid #f1ebe1; vertical-align: top; font-size: 7.8pt; color: #443e35; }
+  table.ref tr:nth-child(even) td { background: #fbf8f3; }
+  table.ref td b { color: #1f1b16; }
+  table.ref td.k { white-space: nowrap; font-family: "DejaVu Sans Mono", monospace; font-weight: 700; font-size: 7.5pt; color: #1f1b16; }
+  table.ref th:first-child { border-radius: 5px 0 0 0; }
+  table.ref th:last-child { border-radius: 0 5px 0 0; }
+
+  pre.code {
+    background: #2b2620; color: #e8ddc9; font-size: 7pt;
+    border-radius: 6px; padding: 8px 10px; margin: 5px 0 8px 0;
+    line-height: 1.5; white-space: pre-wrap;
+  }
+  pre.code .cm { color: #8f877c; }
+  pre.code .key { color: #f0b393; }
+  pre.code .str { color: #a8c8a0; }
+  pre.code .hl { color: #e8b04a; }
+
+  .duo { display: table; width: 100%; border-spacing: 8px 0; margin: 0 -8px 8px -8px; }
+  .duo > div { display: table-cell; width: 50%; vertical-align: top; }
+
+  .notebox {
+    background: #faf5ee; border: 1px solid #e8dfd2; border-left: 4px solid #d97757;
+    border-radius: 6px; padding: 8px 12px; margin-bottom: 8px;
+    page-break-inside: avoid;
+  }
+  .notebox.green { border-left-color: #4a7856; }
+  .notebox.blue  { border-left-color: #3d5a80; }
+  .notebox.plum  { border-left-color: #8a4f7d; }
+  .notebox h4 { font-size: 8.6pt; color: #1f1b16; margin-bottom: 3px; }
+  .notebox p, .notebox li { font-size: 7.7pt; color: #4c463d; }
+  .notebox ul { margin-left: 13px; }
+  .notebox li { margin-bottom: 2px; }
+
+  .kbd {
+    background: #efe6d9; border: 1px solid #ddd0bd; border-bottom-width: 2px;
+    border-radius: 3px; padding: 0 3px; font-size: 6.9pt; color: #4c463d;
+  }
+
+  .avoid-break { page-break-inside: avoid; }
+  .pagebreak { page-break-before: always; }
+
+  .flowbox {
+    background: #1f1b16; color: #ede5d8; border-radius: 8px;
+    padding: 10px 14px; margin-bottom: 10px; page-break-inside: avoid;
+  }
+  .flowbox h3 { font-size: 9.5pt; color: #d97757; margin-bottom: 5px; }
+  .flowbox td { color: #ede5d8 !important; background: transparent !important; border-bottom: 1px solid #3a342c !important; }
+  .flowbox table.ref th { background: #35302a; }
+  .flowbox td b { color: #f0b393 !important; }
+  .flowbox code { background: #35302a; color: #f0b393; padding: 0 4px; border-radius: 3px; font-size: 7.2pt; }
+  .footer-note { font-size: 7pt; color: #8f877c; text-align: center; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<div class="hero">
+  <h1>Extending Claude Code <span class="accent">&#9670;</span></h1>
+  <div class="sub">Skills, Subagents, Hooks and Plugins explained properly: what they are, when to use which, and how they combine.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Companion to the slash commands cheatsheet.</div>
+</div>
+
+<!-- ============ MAPPA ============ -->
+<h2 class="chapter ch-map"><span class="num">0.</span>The extension map <span class="tag">which tool for which problem</span></h2>
+
+<p class="body-p">Claude Code combines a model that reasons about code with built-in tools (files, search, execution, web). <b>Extensions</b> are the layer above: they customize what Claude knows, connect it to external services and automate workflows. Each one hooks into a different part of the agentic loop:</p>
+
+<table class="ref">
+  <tr><th style="width:16%;">Feature</th><th style="width:30%;">What it does</th><th style="width:27%;">When to use it</th><th>Example</th></tr>
+  <tr><td class="k">CLAUDE.md</td><td>Persistent context loaded <b>in every session</b>, automatically.</td><td>Project conventions, "always do X" rules.</td><td>"Use pnpm, not npm. Run tests before committing."</td></tr>
+  <tr><td class="k">Skill</td><td>Reusable instructions, knowledge and workflows, loaded <b>on demand</b>.</td><td>Reusable content, reference documentation, repeatable tasks.</td><td><code>/deploy</code> runs your deploy checklist; a skill with your API patterns.</td></tr>
+  <tr><td class="k">Subagent</td><td><b>Isolated</b> worker with its own context: does the work and returns only the summary.</td><td>Context isolation, parallel tasks, specialized workers.</td><td>Research that reads dozens of files but reports only the key findings.</td></tr>
+  <tr><td class="k">Hook</td><td>Script/HTTP/prompt executed <b>deterministically</b> at lifecycle events.</td><td>Automations that must always run, without asking.</td><td>ESLint after every file edit.</td></tr>
+  <tr><td class="k">MCP</td><td>Protocol connecting Claude to <b>external services</b> (tools and data).</td><td>Data or actions outside the filesystem.</td><td>Database queries, Slack posts, browser control.</td></tr>
+  <tr><td class="k">Agent team</td><td>Multiple <b>independent Claude Code sessions that communicate</b> with each other (experimental).</td><td>Complex work requiring discussion and coordination.</td><td>Parallel reviewers on security, performance and tests.</td></tr>
+  <tr><td class="k">Plugin</td><td><b>Packages</b> skills + agents + hooks + MCP into an installable unit.</td><td>Reusing the same setup across repos, or distributing it.</td><td>Code-intelligence plugin for your language, from a marketplace.</td></tr>
+</table>
+
+<div class="flowbox">
+  <h3>&#9654; Build your setup over time: the right trigger for each addition</h3>
+  <table class="ref">
+    <tr><th style="width:62%;">When this happens...</th><th>...add this</th></tr>
+    <tr><td>Claude gets a convention or command wrong <b>twice</b></td><td>Line in <code>CLAUDE.md</code></td></tr>
+    <tr><td>You keep typing the same prompt to kick off a task</td><td>Invocable skill <code>/name</code></td></tr>
+    <tr><td>You paste the same playbook into chat for the third time</td><td>Skill</td></tr>
+    <tr><td>You copy data from a browser tab Claude can't see</td><td><code>MCP</code> server</td></tr>
+    <tr><td>A side task floods the conversation with output you'll never reread</td><td>Subagent</td></tr>
+    <tr><td>You want something to happen <b>every time</b>, without asking</td><td>Hook</td></tr>
+    <tr><td>A second repository needs the same setup</td><td>Plugin</td></tr>
+  </table>
+</div>
+
+<!-- ============ SKILLS ============ -->
+<h2 class="chapter ch-skills"><span class="num">1.</span>Skills <span class="tag">the most flexible extension</span></h2>
+
+<p class="body-p">A skill is a folder with a <code>SKILL.md</code> file: YAML frontmatter that tells Claude <b>when</b> to use it, and markdown instructions that say <b>what</b> to do. You invoke it with <code>/skill-name</code>, or Claude loads it on its own when the description matches the task. Unlike CLAUDE.md, a skill's body <b>loads only when needed</b>: even lengthy reference material costs almost nothing until it's used.</p>
+<p class="body-p"><b>Historical note:</b> custom commands were merged into skills. A <code>.claude/commands/deploy.md</code> file and a <code>.claude/skills/deploy/SKILL.md</code> skill both create <code>/deploy</code> and work the same way; skills add supporting files, invocation control and automatic loading. They follow the open <b>Agent Skills</b> standard, shared across multiple AI tools.</p>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Anatomy and your first skill</h3>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># Structure of a skill</span>
+my-skill/
+&#9500;&#9472;&#9472; SKILL.md       <span class="cm"># instructions (required)</span>
+&#9500;&#9472;&#9472; template.md    <span class="cm"># template to fill in</span>
+&#9500;&#9472;&#9472; examples/      <span class="cm"># sample outputs</span>
+&#9492;&#9472;&#9472; scripts/       <span class="cm"># executable scripts</span>
+
+<span class="cm"># ~/.claude/skills/summarize-changes/SKILL.md</span>
+---
+<span class="key">description:</span> Summarizes uncommitted changes
+  and flags risks. Use it when the user asks
+  what changed or wants a commit message.
+---
+
+## Current changes
+<span class="hl">!`git diff HEAD`</span>
+
+## Instructions
+Summarize the changes in 2-3 points, then list the
+risks (missing error handling, hardcoded values,
+tests to update). If the diff is empty, say so.</pre>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>The three superpowers in the file alongside</h4>
+      <ul>
+        <li><b>Well-written description</b> &rarr; Claude invokes it on its own when you ask "what did I change?", without you typing /summarize-changes.</li>
+        <li><b>Dynamic injection</b> <code>!`command`</code> &rarr; Claude Code runs the command <i>before</i> Claude reads the skill and injects its output: the instructions arrive with the real diff already inside, not the one Claude imagines.</li>
+        <li><b>Supporting files</b> &rarr; templates, examples, scripts and reference docs cited by the SKILL.md, loaded only when needed.</li>
+      </ul>
+    </div>
+    <div class="notebox green">
+      <h4>Golden rule: keep the body concise</h4>
+      <p>Once loaded, the skill <b>stays in context</b> for subsequent turns: every line is a recurring token cost. Write <i>what to do</i>, not narratives about why. Same conciseness test as CLAUDE.md (which itself should stay under ~200 lines: if it grows, move material into skills or <code>.claude/rules/</code>).</p>
+    </div>
+  </div>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Where they live and who wins</h3>
+<table class="ref">
+  <tr><th style="width:15%;">Level</th><th style="width:42%;">Path</th><th>Applies to</th></tr>
+  <tr><td><b>Enterprise</b></td><td class="k">organization managed settings</td><td>All users in the org (highest priority)</td></tr>
+  <tr><td><b>Personal</b></td><td class="k">~/.claude/skills/&lt;name&gt;/SKILL.md</td><td>All your projects</td></tr>
+  <tr><td><b>Project</b></td><td class="k">.claude/skills/&lt;name&gt;/SKILL.md</td><td>That project only (commit it to the repo!)</td></tr>
+  <tr><td><b>Plugin</b></td><td class="k">&lt;plugin&gt;/skills/&lt;name&gt;/SKILL.md</td><td>Wherever the plugin is enabled, namespaced <code>plugin:skill</code></td></tr>
+</table>
+<p class="body-p">On a name clash: enterprise &gt; personal &gt; project, and every level <b>overrides bundled skills</b> of the same name (a project-level <code>code-review</code> replaces the stock one). Skills also load from nested directories: in a monorepo, <code>packages/frontend/.claude/skills/</code> activates when Claude works on those files (qualified name: <code>/packages/frontend:deploy</code>). Changes on disk are picked up <b>live</b>, no restart needed.</p>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Frontmatter: the fields that matter</h3>
+<table class="ref">
+  <tr><th style="width:26%;">Field</th><th>What it's for</th></tr>
+  <tr><td class="k">description</td><td>What the skill does and when to use it. It's the criterion Claude uses to decide to load it on its own: put the main use case first (truncated to 1,536 characters in the listing together with <code>when_to_use</code>).</td></tr>
+  <tr><td class="k">disable-model-invocation</td><td><code>true</code> = only you can invoke it with /name; Claude never loads it on its own. For workflows with side effects (deploy, commit) you don't want starting autonomously.</td></tr>
+  <tr><td class="k">user-invocable</td><td><code>false</code> = hidden from the / menu: background knowledge that makes no sense to invoke by hand.</td></tr>
+  <tr><td class="k">allowed-tools / disallowed-tools</td><td>Tools usable without permission prompts while the skill is active / tools removed from the pool (e.g. no <code>AskUserQuestion</code> in an autonomous loop).</td></tr>
+  <tr><td class="k">model / effort</td><td>Model and effort to use while the skill is active (override for the current turn, then back to session settings).</td></tr>
+  <tr><td class="k">context: fork &nbsp;+&nbsp; agent</td><td>Runs the skill in a <b>forked subagent</b> instead of inline; <code>agent</code> picks which subagent type. The bridge between skills and subagents.</td></tr>
+  <tr><td class="k">argument-hint / arguments</td><td>Hint shown in autocomplete (e.g. <code>[issue-number]</code>) and positional names for <code>$name</code> substitutions.</td></tr>
+  <tr><td class="k">paths</td><td>Globs that restrict automatic activation to matching files only (e.g. only when you touch <code>*.sql</code>).</td></tr>
+  <tr><td class="k">hooks</td><td>Hooks scoped to the skill's lifecycle.</td></tr>
+</table>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Substitutions available in the body</h3>
+<table class="ref">
+  <tr><th style="width:30%;">Variable</th><th>Expansion</th></tr>
+  <tr><td class="k">$ARGUMENTS</td><td>All arguments passed at invocation (if absent, they're appended as <code>ARGUMENTS: ...</code>).</td></tr>
+  <tr><td class="k">$0, $1... / $ARGUMENTS[N]</td><td>Single argument by position (0-based).</td></tr>
+  <tr><td class="k">$name</td><td>Named argument declared in <code>arguments:</code> (e.g. <code>arguments: [issue, branch]</code> &rarr; <code>$issue</code>, <code>$branch</code>).</td></tr>
+  <tr><td class="k">${CLAUDE_SKILL_DIR}</td><td>The skill's directory: for referencing bundled scripts and files regardless of the working directory.</td></tr>
+  <tr><td class="k">${CLAUDE_PROJECT_DIR} / ${CLAUDE_SESSION_ID} / ${CLAUDE_EFFORT}</td><td>Project root, session ID, current effort level.</td></tr>
+</table>
+
+<!-- ============ SUBAGENTS ============ -->
+
+<h2 class="chapter ch-agents"><span class="num">2.</span>Subagents <span class="tag">isolated workers, clean context</span></h2>
+
+<p class="body-p">A subagent is a specialized assistant with <b>its own context window</b>, a custom system prompt, and independent tools and permissions. The key use case: a side task that would flood the main conversation with searches, logs and file contents you'll never reread. The subagent does that work in its own context and <b>returns only the summary</b>. Define a custom subagent when you notice you keep launching the same kind of worker with the same instructions.</p>
+
+<div class="notebox blue">
+  <h4>Why use them (in 5 points)</h4>
+  <ul>
+    <li><b>They preserve context</b>: exploration and research stay out of the main conversation.</li>
+    <li><b>They constrain capabilities</b>: you limit which tools they can use (e.g. read-only).</li>
+    <li><b>They're reusable</b>: those in ~/.claude/agents/ apply to all projects.</li>
+    <li><b>They specialize behavior</b>: a system prompt focused on one domain.</li>
+    <li><b>They control costs</b>: route simple tasks to fast, cheap models like Haiku.</li>
+  </ul>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> The built-in subagents</h3>
+<table class="ref">
+  <tr><th style="width:18%;">Agent</th><th style="width:26%;">Tools</th><th>When Claude uses it</th></tr>
+  <tr><td class="k">Explore</td><td>Read-only (Write/Edit denied)</td><td>Searching and understanding the codebase without modifying it. Claude specifies the depth: <b>quick</b>, <b>medium</b> or <b>very thorough</b>. Inherits the conversation's model (capped at Opus on the Anthropic API). Skips CLAUDE.md to stay fast and cheap.</td></tr>
+  <tr><td class="k">Plan</td><td>Read-only</td><td>Codebase research during <b>plan mode</b>: exploration stays in a separate window while the main conversation remains read-only.</td></tr>
+  <tr><td class="k">general-purpose</td><td>All tools</td><td>Complex multi-step tasks requiring both exploration and modification.</td></tr>
+</table>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Creating one: markdown file + frontmatter</h3>
+<p class="body-p">A subagent is a markdown file in <code>.claude/agents/</code> (project) or <code>~/.claude/agents/</code> (personal). The quickest way: <b>ask Claude to write it</b> ("Create a code-improver subagent in ~/.claude/agents/ that... read-only, on Sonnet"). File changes are picked up within seconds, no restart.</p>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm"># ~/.claude/agents/code-reviewer.md</span>
+---
+<span class="key">name:</span> code-reviewer
+<span class="key">description:</span> Expert reviewer. Use it
+  proactively after code changes.
+<span class="key">tools:</span> Read, Glob, Grep
+<span class="key">model:</span> sonnet
+---
+
+You are a senior code reviewer. Analyze the
+code and give specific, actionable feedback
+on quality, security and best practices.</pre>
+    <p class="body-p" style="font-size:7.6pt;">The body becomes the subagent's <b>system prompt</b>: it receives only that plus basic environment info, not Claude Code's full system prompt. The <code>description</code> is what Claude uses to decide when to delegate: write it clearly.</p>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Priority on a name clash</h4>
+      <p>Managed settings &gt; CLI flag <code>--agents</code> (JSON, session only) &gt; project <code>.claude/agents/</code> &gt; <code>~/.claude/agents/</code> &gt; plugins. Directories are scanned recursively: you can organize into subfolders (agents/review/, agents/research/); identity comes only from the <code>name</code> field.</p>
+    </div>
+    <div class="notebox blue">
+      <h4>Skill vs Subagent, in one sentence</h4>
+      <p><b>Skill</b> = reusable content you load into a context (adds to your window). <b>Subagent</b> = isolated worker that works in a separate window and returns only the summary. And they combine: a subagent can preload skills (<code>skills:</code> field), a skill can run in a subagent (<code>context: fork</code>).</p>
+    </div>
+  </div>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Frontmatter: the fields that matter</h3>
+<table class="ref">
+  <tr><th style="width:26%;">Field</th><th>What it's for</th></tr>
+  <tr><td class="k">name / description</td><td>The only required fields: identifier (lowercase and hyphens) and delegation criterion.</td></tr>
+  <tr><td class="k">tools / disallowedTools</td><td>Tool allowlist / denylist. If omitted, inherits everything. They support MCP patterns: <code>mcp__github</code> removes all of that server's tools, <code>mcp__*</code> all MCP tools.</td></tr>
+  <tr><td class="k">model</td><td><code>sonnet</code>, <code>opus</code>, <code>haiku</code>, <code>fable</code>, a full model ID, or <code>inherit</code> (default). The cost trick: research on Haiku, implementation on the big model.</td></tr>
+  <tr><td class="k">permissionMode</td><td><code>default</code>, <code>acceptEdits</code>, <code>auto</code>, <code>dontAsk</code>, <code>bypassPermissions</code>, <code>plan</code>: permissions independent from the parent session.</td></tr>
+  <tr><td class="k">skills</td><td>Skills <b>preloaded</b> into the subagent's context at startup (full content, not just the description).</td></tr>
+  <tr><td class="k">isolation: worktree</td><td>The subagent works in a <b>temporary git worktree</b>: an isolated copy of the repo, cleaned up automatically if it makes no changes. Zero conflicts with your working tree.</td></tr>
+  <tr><td class="k">background</td><td><code>true</code> = always runs in the background (in recent versions it's the default anyway when possible: you keep working, the result arrives).</td></tr>
+  <tr><td class="k">memory</td><td>Persistent memory scope (<code>user</code>/<code>project</code>/<code>local</code>): the subagent <b>learns across sessions</b>.</td></tr>
+  <tr><td class="k">maxTurns / effort / color / hooks</td><td>Turn limit, reasoning level, transcript color, hooks scoped to its lifecycle.</td></tr>
+</table>
+
+<div class="notebox blue">
+  <h4>Subagent vs Agent team (experimental)</h4>
+  <p><b>Subagents</b> run inside your session and report only to the caller: contained costs, ideal for focused tasks. <b>Agent teams</b> are independent Claude Code sessions that message each other, with a shared task list and self-coordination: they're needed when teammates must discuss (competing hypotheses, parallel review, features with separate ownership), but each teammate is a full Claude instance, so it costs. Transition point: if your parallel subagents hit context limits or would need to talk to each other, the natural step is a team.</p>
+</div>
+
+<!-- ============ HOOKS ============ -->
+
+<h2 class="chapter ch-hooks"><span class="num">3.</span>Hooks <span class="tag">determinism: it always happens, not "if Claude remembers"</span></h2>
+
+<p class="body-p">Hooks are shell commands (or HTTP requests, or prompts) that fire at precise points in the Claude Code lifecycle. The philosophical difference from everything else: <b>they don't depend on the model's judgment</b>. A hook guarantees something always happens — formatting after every edit, blocking touches to certain files, notifying when input is needed — instead of hoping the LLM chooses to do it. For decisions that require judgment there are also <b>prompt-based</b> and <b>agent-based</b> hooks that use a model to evaluate the condition.</p>
+<p class="body-p">They're configured in the <code>"hooks"</code> block of a settings file (<code>~/.claude/settings.json</code> personal, <code>.claude/settings.json</code> project). The <code>/hooks</code> menu is read-only: to change them you edit the JSON or ask Claude.</p>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> The main events</h3>
+<table class="ref">
+  <tr><th style="width:26%;">Event</th><th>When it fires</th></tr>
+  <tr><td class="k">SessionStart</td><td>On session start or resume (matcher <code>compact</code> = after every compaction). The stdout is <b>added to Claude's context</b>.</td></tr>
+  <tr><td class="k">UserPromptSubmit</td><td>When you submit a prompt, before Claude processes it.</td></tr>
+  <tr><td class="k">PreToolUse</td><td>Before a tool executes. <b>Can block it</b> (exit code 2).</td></tr>
+  <tr><td class="k">PermissionRequest</td><td>When a permission dialog is about to appear: it can answer on your behalf with JSON <code>{"behavior": "allow"}</code>.</td></tr>
+  <tr><td class="k">PostToolUse / PostToolUseFailure</td><td>After a tool succeeded / failed.</td></tr>
+  <tr><td class="k">Notification</td><td>When Claude Code sends a notification (matchers: <code>permission_prompt</code>, <code>idle_prompt</code>...).</td></tr>
+  <tr><td class="k">Stop / SubagentStart / SubagentStop</td><td>When Claude finishes responding / a subagent starts or ends.</td></tr>
+  <tr><td class="k">ConfigChange / FileChanged / CwdChanged</td><td>When configuration files, watched files on disk, or the working directory change (e.g. reloading direnv).</td></tr>
+</table>
+<p class="body-p" style="font-size:7.6pt;">All hooks matching an event run <b>in parallel</b>; identical commands are deduplicated. Input arrives as JSON on stdin (convenient to read with <code>jq</code>).</p>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> The three recipes everyone uses</h3>
+
+<div class="duo">
+  <div>
+<pre class="code"><span class="cm">// 1. Auto-format after every edit
+// .claude/settings.json (in the project)</span>
+{
+  <span class="key">"hooks"</span>: {
+    <span class="key">"PostToolUse"</span>: [{
+      <span class="key">"matcher"</span>: <span class="str">"Edit|Write"</span>,
+      <span class="key">"hooks"</span>: [{
+        <span class="key">"type"</span>: <span class="str">"command"</span>,
+        <span class="key">"command"</span>: <span class="str">"jq -r '.tool_input.file_path'
+          | xargs npx prettier --write"</span>
+      }]
+    }]
+  }
+}</pre>
+<pre class="code"><span class="cm">// 2. Desktop notification when input is needed
+// ~/.claude/settings.json (Linux)</span>
+{
+  <span class="key">"hooks"</span>: {
+    <span class="key">"Notification"</span>: [{
+      <span class="key">"matcher"</span>: <span class="str">""</span>,
+      <span class="key">"hooks"</span>: [{
+        <span class="key">"type"</span>: <span class="str">"command"</span>,
+        <span class="key">"command"</span>: <span class="str">"notify-send 'Claude Code'
+          'Your attention is needed'"</span>
+      }]
+    }]
+  }
+}</pre>
+  </div>
+  <div>
+<pre class="code"><span class="cm"># 3. Protecting sensitive files
+# .claude/hooks/protect-files.sh
+# (registered on PreToolUse, matcher Edit|Write)</span>
+#!/bin/bash
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | jq -r \
+  '.tool_input.file_path // empty')
+
+PROTECTED=(".env" "package-lock.json" ".git/")
+
+for pattern in "${PROTECTED[@]}"; do
+  if [[ "$FILE_PATH" == *"$pattern"* ]]; then
+    echo "Blocked: $FILE_PATH" >&2
+    <span class="hl">exit 2   # exit 2 = blocks the action;</span>
+             <span class="cm"># Claude receives the reason and</span>
+             <span class="cm"># adapts its approach</span>
+  fi
+done
+exit 0</pre>
+    <div class="notebox plum">
+      <h4>The contract in brief</h4>
+      <ul>
+        <li><span class="kbd">exit 0</span> = all good, proceed.</li>
+        <li><span class="kbd">exit 2</span> = <b>blocks</b> the action; stderr goes back to Claude as the explanation.</li>
+        <li>On <b>SessionStart</b> the stdout is injected into the context: perfect for re-injecting conventions after a /compact (matcher <code>compact</code>) or the output of <code>git log --oneline -5</code>.</li>
+        <li>On <b>PermissionRequest</b>, keep matchers <b>tight</b>: an empty matcher or <code>.*</code> would auto-approve everything, including writes and shell.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PLUGINS ============ -->
+<h2 class="chapter ch-plugins"><span class="num">4.</span>Plugins <span class="tag">the packaging layer</span></h2>
+
+<p class="body-p">A plugin packages <b>skills + subagents + hooks + MCP servers</b> into a single installable unit, distributed as a Git repo (or zip/URL). Plugin skills are namespaced (<code>/my-plugin:review</code>), so multiple plugins coexist without conflicts. It's the answer to the trigger "a second repository needs the same setup": instead of copying .claude/ files around, you install.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox">
+      <h4>How to use them</h4>
+      <ul>
+        <li><span class="kbd">/plugin</span> opens the menu; direct subcommands: <code>list</code>, <code>install</code>, <code>enable</code>, <code>disable</code>.</li>
+        <li><b>Marketplaces</b> distribute plugin collections: Anthropic hosts an official one, and teams/communities publish others (public Git repos).</li>
+        <li><span class="kbd">/reload-plugins</span> applies changes without restarting.</li>
+        <li>For security reasons, plugin subagents ignore <code>hooks</code>, <code>mcpServers</code> and <code>permissionMode</code>: if you need them, copy the file into .claude/agents/.</li>
+        <li>Neat trick: add a <code>.claude-plugin/plugin.json</code> to a skill folder and that skill becomes a plugin capable of including agents, hooks and MCP.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox">
+      <h4>Vet before you trust</h4>
+      <p>A plugin is <b>third-party code running in your environment</b>: hooks that execute shell commands, MCP servers that talk to the outside. Before installing from community marketplaces, read what it contains (skills, hooks and configurations are text files in the plugin's repo: they can be inspected). For teams, the "in-house" plugin, committed and reviewed like code, is the most solid pattern.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RICETTE ============ -->
+<div class="avoid-break">
+<h2 class="chapter ch-map"><span class="num">5.</span>Combinations worth gold <span class="tag">when the pieces talk to each other</span></h2>
+
+<table class="ref">
+  <tr><th style="width:34%;">Recipe</th><th>How and why</th></tr>
+  <tr><td><b>Skill running in a subagent</b></td><td><code>context: fork</code> (+ <code>agent:</code> to pick the type) in the skill's frontmatter: the workflow starts with /name but works in an isolated context and returns only the result. Ideal for long, noisy procedures.</td></tr>
+  <tr><td><b>Subagent with preloaded skills</b></td><td><code>skills:</code> field in the agent's frontmatter: the worker is born with your API conventions or review checklist already on board, full content, without having to discover them.</td></tr>
+  <tr><td><b>Cheap subagent for exploration</b></td><td>A custom <code>Explore</code> agent with <code>model: haiku</code> overrides the built-in and keeps research on the cheapest model, while the main conversation stays on the powerful one.</td></tr>
+  <tr><td><b>Hook + security skill</b></td><td>A <code>PreToolUse</code> hook that blocks sensitive files (deterministic) + an invocable review skill (judgment): belt and suspenders.</td></tr>
+  <tr><td><b>Enthusiasm-proof deploy</b></td><td><code>/deploy</code> skill with <code>disable-model-invocation: true</code> (runs only if you launch it) + restricted <code>allowed-tools</code> + <code>!`git status`</code> injection to decide based on reality.</td></tr>
+  <tr><td><b>MCP + a skill that uses it well</b></td><td>The MCP gives Claude the tools (e.g. the database); the skill teaches it your team's schema and query patterns. Tools + usage knowledge.</td></tr>
+  <tr><td><b>All together &rarr; plugin</b></td><td>When the combination works, package it: skills + agents + hooks + MCP in a plugin installable on every team repo.</td></tr>
+</table>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — features-overview, skills, sub-agents, hooks-guide, plugins · Features evolve fast: /release-notes is the truth for your version.</div>
+
+</body>
+</html>

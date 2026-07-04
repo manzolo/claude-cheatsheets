@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Lavoro parallelo e cloud</span>
+
+<div class="hero">
+  <h1>Lavoro parallelo e cloud <span class="accent">&#9670;</span></h1>
+  <div class="sub">Subagenti, agent view, batch su worktrees, agent teams, sessioni web e remote control: come far lavorare tre Claude mentre tu fai altro.</div>
+  <div class="meta">Aggiornato: luglio 2026 · Fonte: documentazione ufficiale Anthropic (code.claude.com/docs) · Vol. 6 della serie bignami Claude Code.</div>
+</div>
+
+<h2 class="chapter ch-e"><span class="num">1.</span>La scala del parallelismo <span class="tag">quattro livelli, dal più leggero al più pesante</span></h2>
+
+<table class="ref">
+  <tr><th style="width:20%;">Strumento</th><th style="width:34%;">Cos'è</th><th style="width:24%;">Quando</th><th>Costo relativo</th></tr>
+  <tr><td><b>Subagent</b></td><td>Worker dentro la tua sessione, contesto proprio, riporta solo il sunto al chiamante.</td><td>Task focalizzato dove conta solo il risultato.</td><td>Basso (risultati riassunti)</td></tr>
+  <tr><td><b>Background session</b> (agent view)</td><td>Sessioni Claude Code complete e indipendenti, senza terminale attaccato, gestite da un supervisor.</td><td>Più task indipendenti in parallelo, tu supervisioni.</td><td>Ognuna consuma quota per conto suo</td></tr>
+  <tr><td><b>/batch</b> (workflow)</td><td>Decompone un lavoro grosso in 5-30 unità, un subagente per unità in un worktree isolato, una PR ciascuno.</td><td>Modifica meccanica su tutto il codebase (migrazioni, rename).</td><td>Proporzionale alle unità</td></tr>
+  <tr><td><b>Agent team</b> (sperimentale)</td><td>Sessioni indipendenti che si <b>messaggiano tra loro</b>, task list condivisa, auto-coordinamento.</td><td>Lavoro che richiede discussione: ipotesi in competizione, review parallela, feature con ownership separate.</td><td>Alto (~7&times; in plan mode)</td></tr>
+</table>
+
+<h2 class="chapter ch-f"><span class="num">2.</span>Agent view <span class="tag">claude agents: la plancia di controllo</span></h2>
+
+<p class="body-p">Un unico schermo per tutte le sessioni in background: cosa gira, cosa ha bisogno di te, cosa è finito. Ogni sessione è una conversazione Claude Code completa che continua <b>senza terminale attaccato</b> — un processo supervisor le ospita, sopravvivono alla chiusura della shell e allo sleep della macchina.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox blue">
+      <h4>Il loop operativo</h4>
+      <ol>
+        <li><span class="kbd">claude agents</span> apre la vista; ogni prompt che digiti in basso <b>lancia una nuova sessione</b> (non un follow-up).</li>
+        <li><span class="kbd">Spazio</span> su una riga = <b>peek</b>: ultimo output o la domanda in attesa; rispondi da lì, con i tasti numerici per le scelte multiple, <span class="kbd">Tab</span> per una risposta suggerita, <code>!</code> per mandare un comando Bash.</li>
+        <li><span class="kbd">Invio</span>/<span class="kbd">&rarr;</span> = <b>attach</b>: la sessione prende il terminale, con recap di ciò che è successo; <span class="kbd">&larr;</span> su prompt vuoto = detach.</li>
+        <li>Da una sessione normale, <code>/bg</code> la stacca in background e la fa comparire come riga.</li>
+      </ol>
+    </div>
+  </div>
+  <div>
+    <div class="notebox blue">
+      <h4>Leggere le righe</h4>
+      <ul>
+        <li>Stati: animato = al lavoro, giallo = serve input, verde = completato, rosso = fallito, grigio = fermato; <code>&#8729;</code> = processo uscito ma riattaccabile (riparte da dov'era), <code>&#10018;</code> = /loop che dorme tra le iterazioni.</li>
+        <li>Il riassunto di riga è generato da un modello classe Haiku (refresh max ogni 15s); <code>2/5</code> = elementi paralleli completati/totali.</li>
+        <li><b>PR #N</b> a destra = la pull request aperta dalla sessione, colorata per stato: gialla in attesa di check/review, verde pronta, viola merged. Per molti task è lì che raccogli il risultato.</li>
+        <li>Dalla shell: <code>claude attach/logs/stop/respawn/rm &lt;id&gt;</code>, e <code>claude agents --json</code> per lo scripting.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-b"><span class="num">3.</span>Batch, worktrees e fork <span class="tag">parallelismo senza pestarsi i piedi</span></h2>
+
+<div class="duo">
+  <div>
+    <div class="notebox green">
+      <h4>/batch: la modifica su larga scala</h4>
+      <p><code>/batch migra src/ da Solid a React</code>: Claude studia il codebase, decompone in <b>5-30 unità indipendenti</b> e presenta un piano. Approvato, lancia un subagente per unità, ognuno in un <b>git worktree isolato</b>: implementa, testa, apre una PR. Tu fai il review di N pull request invece di sorvegliare N agenti. Richiede un repo git.</p>
+    </div>
+    <div class="notebox green">
+      <h4>Worktrees: perché sono la chiave</h4>
+      <p>Un worktree è una copia di lavoro separata dello stesso repo: ogni agente edita la sua, zero conflitti con il tuo albero. Li usano /batch, i subagenti con <code>isolation: worktree</code> (worktree temporaneo, ripulito se non ci sono modifiche) e il flag <code>--worktree</code> di lancio. Vivono sotto <code>.claude/worktrees/</code>.</p>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>/fork vs /branch (facile confonderli)</h4>
+      <ul>
+        <li><code>/fork &lt;direttiva&gt;</code> = <b>delega</b>: spawna un subagente in background che eredita l'intera conversazione, lavora sulla direttiva mentre tu continui, e il risultato ti rientra in chat.</li>
+        <li><code>/branch [nome]</code> = <b>biforca te stesso</b>: copia della conversazione al punto attuale, tu passi nel ramo, l'originale resta recuperabile con /resume. Il git branch delle conversazioni.</li>
+      </ul>
+    </div>
+    <div class="notebox green">
+      <h4>/tasks e /workflows</h4>
+      <p><code>/tasks</code> elenca tutto ciò che gira in background nella sessione corrente; <code>/workflows</code> apre la vista di avanzamento dei workflow dinamici (pausa, riprendi, salva). <code>/background</code> stacca l'intera sessione e libera il terminale.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">4.</span>Cloud e multi-dispositivo <span class="tag">il terminale non è più un confine</span></h2>
+
+<table class="ref">
+  <tr><th style="width:26%;">Strumento</th><th>Cosa fa</th></tr>
+  <tr><td class="k">Claude Code on the web</td><td>Sessioni in sandbox cloud Anthropic dal browser o dal telefono: colleghi un repo GitHub, dai il task, fai review della PR. Ambienti configurabili (setup script, accesso rete, Docker); <code>/remote-env</code> sceglie il default.</td></tr>
+  <tr><td class="k">/teleport &nbsp;(/tp)</td><td>Tira una sessione web <b>dentro il terminale</b>: scarica branch e conversazione e continui in locale.</td></tr>
+  <tr><td class="k">/remote-control &nbsp;(/rc)</td><td>L'inverso: la sessione <b>locale</b> diventa controllabile da claude.ai o dall'app mobile. Il classico "continuo dal divano". Esiste anche in modalità server: <code>claude remote-control</code>.</td></tr>
+  <tr><td class="k">/ultraplan &lt;prompt&gt;</td><td>Prepara il piano in una sessione cloud, lo rivedi nel browser, poi esegui in remoto o lo rimandi al terminale.</td></tr>
+  <tr><td class="k">/autofix-pr [prompt]</td><td>Sessione cloud che sorveglia la PR del branch corrente e pusha fix quando la CI fallisce o arrivano commenti dei reviewer.</td></tr>
+  <tr><td class="k">/schedule &nbsp;(/routines)</td><td>Routine su infrastruttura gestita: a orario, via API o su eventi GitHub. Il cron che non richiede una macchina accesa.</td></tr>
+  <tr><td class="k">/desktop &nbsp;/&nbsp; /mobile</td><td>Continua nell'app desktop (sessioni parallele con isolamento git, pannelli, diff visuale) / QR per l'app mobile con notifiche push quando Claude ha bisogno di te.</td></tr>
+</table>
+
+<h2 class="chapter ch-d"><span class="num">5.</span>Agent teams <span class="tag">sperimentale: attiva solo se ti serve davvero</span></h2>
+
+<p class="body-p">Si abilitano con <code>CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1</code> (env o settings.json). Ogni teammate è una sessione Claude Code indipendente; comunicano con messaggi diretti e una task list condivisa, e possono riusare le definizioni dei tuoi subagenti (tools e model dal frontmatter, corpo come istruzioni aggiuntive).</p>
+
+<div class="flowbox">
+  <h3>&#9654; Regole d'oro per non farsi male (col portafoglio)</h3>
+  <ul>
+    <li><b>Sonnet per i teammate</b>: bilancia capacità e costo per il coordinamento.</li>
+    <li><b>Team piccoli</b>: il consumo è ~proporzionale al numero di teammate; in plan mode si arriva a ~7&times; una sessione normale.</li>
+    <li><b>Prompt di spawn asciutti</b>: CLAUDE.md, MCP e skill si caricano da soli; tutto ciò che aggiungi entra nel contesto di ognuno.</li>
+    <li><b>Spegni chi ha finito</b>: un teammate attivo consuma finché non esce.</li>
+    <li><b>Il punto di transizione</b>: passa ai team solo quando i subagenti paralleli sbattono sui limiti di contesto o avrebbero bisogno di parlarsi. Per tutto il resto, subagenti e agent view bastano e costano meno.</li>
+  </ul>
+</div>
+
+<div class="footer-note">Fonti: code.claude.com/docs — agents, agent-view, agent-teams, claude-code-on-the-web, remote-control, routines · Molte di queste feature sono in research preview: /release-notes per lo stato attuale.</div>
+</body></html>

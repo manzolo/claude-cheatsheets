@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"></head><body>
+<span class="doctitle">Claude Code · Permissions, sandbox and security</span>
+
+<div class="hero">
+  <h1>Permissions, sandbox and security <span class="accent">&#9670;</span></h1>
+  <div class="sub">Allow/ask/deny rules, permission modes, the sandboxed Bash with OS-level isolation, and how to let Claude run autonomously without handing over the keys to the house.</div>
+  <div class="meta">Updated: July 2026 · Source: official Anthropic documentation (code.claude.com/docs) · Vol. 5 of the Claude Code cheatsheet series.</div>
+</div>
+
+<h2 class="chapter ch-g"><span class="num">1.</span>The permission system <span class="tag">who decides what Claude may do</span></h2>
+
+<p class="body-p">Three kinds of rules, managed via <code>/permissions</code> or in the settings files (committable to the repo for the whole team): <b>allow</b> = the tool runs without approval; <b>ask</b> = confirmation required every time; <b>deny</b> = forbidden. Evaluation order is <b>deny &rarr; ask &rarr; allow</b>: the first match wins, and specificity does <i>not</i> matter — a broad deny like <code>Bash(aws *)</code> blocks everything, even what a narrower allow would permit. A <b>bare-name</b> deny (<code>Bash</code>) removes the tool from Claude's context; a scoped one (<code>Bash(rm *)</code>) keeps the tool and blocks matching calls.</p>
+
+<div class="notebox red">
+  <h4>Who enforces what (the enforcement hierarchy)</h4>
+  <p>Permission rules are enforced <b>by Claude Code</b>, not by the model: instructions in the prompt or in CLAUDE.md shape what Claude <i>tries</i> to do, but don't change what it is <i>allowed</i> to do. From weakest to strongest: CLAUDE.md (persuasion) &rarr; permission rules / PreToolUse hooks (client-side enforcement) &rarr; sandbox (OS-level enforcement, which also covers child processes).</p>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Rule syntax</h3>
+<table class="ref">
+  <tr><th style="width:36%;">Rule</th><th>Matches</th></tr>
+  <tr><td class="k">Bash &nbsp;/&nbsp; WebFetch &nbsp;/&nbsp; Read</td><td>Every use of the tool (equivalent to <code>Bash(*)</code>).</td></tr>
+  <tr><td class="k">Bash(npm run build)</td><td>Exactly that command.</td></tr>
+  <tr><td class="k">Bash(npm run test *)</td><td>Prefix + wildcard. <b>The space before * is crucial</b>: <code>Bash(ls *)</code> matches <code>ls -la</code> but not <code>lsof</code>; <code>Bash(ls*)</code> matches both. A single * also spans spaces: <code>Bash(git * main)</code> matches <code>git push origin main</code>.</td></tr>
+  <tr><td class="k">Read(./.env) &nbsp;/&nbsp; Edit(/src/**/*.ts)</td><td>Gitignore-style patterns. Anchors: <code>//path</code> = absolute from the root, <code>~/path</code> = home, <code>/path</code> = <b>relative to the project root</b> (classic trap!), <code>path</code> = relative to the cwd. A bare name like <code>Read(.env)</code> matches at any depth.</td></tr>
+  <tr><td class="k">WebFetch(domain:example.com)</td><td>Fetches to that domain.</td></tr>
+  <tr><td class="k">Agent(model:opus) &nbsp;/&nbsp; Bash(run_in_background:true)</td><td>Match on a top-level input parameter (deny and ask only). One parameter per rule; * as a wildcard in the value.</td></tr>
+  <tr><td class="k">mcp__github &nbsp;/&nbsp; mcp__*</td><td>All tools of that MCP server / all MCP tools (deny/ask). Allows accept globs only after a literal <code>mcp__&lt;server&gt;__</code> prefix.</td></tr>
+</table>
+
+<div class="duo">
+  <div>
+    <div class="notebox plum">
+      <h4>Compound commands and wrappers</h4>
+      <ul>
+        <li>Claude Code recognizes <code>&amp;&amp;</code>, <code>||</code>, <code>;</code>, <code>|</code>, <code>&amp;</code> and newlines: a rule must match <b>every</b> subcommand. <code>Bash(safe-cmd *)</code> does not authorize <code>safe-cmd &amp;&amp; other</code>.</li>
+        <li>Wrappers stripped before matching: <code>timeout</code>, <code>time</code>, <code>nice</code>, <code>nohup</code>, <code>stdbuf</code>, xargs without flags. <b>Not</b> stripped: <code>npx</code>, <code>docker exec</code>, <code>devbox run</code>... — <code>Bash(devbox run *)</code> would also match <code>devbox run rm -rf .</code>: write the rule with runner + inner command.</li>
+        <li>Built-in set of <b>read-only</b> commands (ls, cat, grep, find, wc, diff, stat, du, cd, read-only git...) that always run without prompting in every mode.</li>
+      </ul>
+    </div>
+  </div>
+  <div>
+    <div class="notebox plum">
+      <h4>The curl case (why argument patterns are fragile)</h4>
+      <p><code>Bash(curl http://github.com/ *)</code> doesn't cover options before the URL, https, redirects, variables, double spaces. More robust: <b>deny</b> curl/wget + <b>WebFetch(domain:github.com)</b> for the allowed domains, or a PreToolUse hook that validates URLs. And remember: if Bash is allowed, the network is reachable anyway — the real boundary comes from the sandbox (ch. 3).</p>
+      <p style="margin-top:4px;">Read/Edit denies cover Claude's file tools and the file commands recognized in Bash (cat, head, sed...), <b>not</b> a Python script that opens files on its own: for that you need the sandbox.</p>
+    </div>
+  </div>
+</div>
+
+<h2 class="chapter ch-c"><span class="num">2.</span>Permission modes <span class="tag">Shift+Tab to cycle</span></h2>
+
+<table class="ref">
+  <tr><th style="width:22%;">Mode</th><th>Behavior</th></tr>
+  <tr><td class="kw">default</td><td>Asks on the first use of each tool.</td></tr>
+  <tr><td class="kw">acceptEdits</td><td>Auto-accepts file edits and common filesystem commands (mkdir, touch, mv, cp) in the working directories.</td></tr>
+  <tr><td class="kw">plan</td><td><b>Plan mode</b>: Claude explores read-only and presents a plan before touching anything. The safest mode for large changes.</td></tr>
+  <tr><td class="kw">auto</td><td>Approves calls with background safety checks that verify alignment with the request (research preview).</td></tr>
+  <tr><td class="kw">dontAsk</td><td>Denies everything not pre-approved by allow rules: the baseline for unattended runs and locked-down CI.</td></tr>
+  <tr><td class="kw">bypassPermissions</td><td>Skips the prompts (explicit <b>ask</b> rules still force a prompt, and <code>rm -rf /</code> or <code>~</code> remain a lifesaver that asks). <b>Only in isolated environments</b>: containers or VMs. Admins disable it with <code>permissions.disableBypassPermissionsMode: "disable"</code> in managed settings.</td></tr>
+</table>
+
+<h2 class="chapter ch-b"><span class="num">3.</span>The Bash sandbox <span class="tag">operating-system-level enforcement</span></h2>
+
+<p class="body-p">The sandbox flips the approach: instead of approving each command, you define <b>which files and which domains</b> commands may touch, and the OS enforces the boundary on every Bash command <b>and its child processes</b>. On macOS it uses Seatbelt (nothing to install); on Linux and WSL2 you need <code>bubblewrap</code> and <code>socat</code> (<code>sudo apt-get install bubblewrap socat</code>). Enable and manage it with <code>/sandbox</code>.</p>
+
+<div class="duo">
+  <div>
+    <div class="notebox green">
+      <h4>Two modes</h4>
+      <ul>
+        <li><b>Auto-allow</b>: sandboxed commands run <b>without prompting</b>; whatever can't run sandboxed (e.g. network to non-allowed hosts) falls back to the normal permission flow. Explicit denies and scoped asks still apply; rm on / or home always asks.</li>
+        <li><b>Regular permissions</b>: same restrictions, but the prompts remain.</li>
+      </ul>
+      <p>Default: writes only to the working directory and session temp; the first time a new network domain is needed, Claude Code asks. Escape hatch: if a command fails because of the sandbox, Claude can retry outside it (with your approval); disable with <code>"allowUnsandboxedCommands": false</code> (strict mode).</p>
+    </div>
+    <div class="notebox red">
+      <h4>Ubuntu 24.04+: the AppArmor gotcha</h4>
+      <p>The default AppArmor profile prevents bubblewrap from creating user namespaces. If <code>sysctl kernel.apparmor_restrict_unprivileged_userns</code> returns 1, add a profile for bwrap:</p>
+<pre class="code">sudo tee /etc/apparmor.d/bwrap &lt;&lt;'EOF'
+abi &lt;abi/4.0&gt;,
+include &lt;tunables/global&gt;
+profile bwrap /usr/bin/bwrap flags=(unconfined) {
+  userns,
+  include if exists &lt;local/bwrap&gt;
+}
+EOF
+sudo systemctl reload apparmor</pre>
+    </div>
+  </div>
+  <div>
+    <div class="notebox green">
+      <h4>Configuration (settings.json)</h4>
+<pre class="code">{
+  <span class="key">"sandbox"</span>: {
+    <span class="key">"enabled"</span>: true,
+    <span class="key">"filesystem"</span>: {
+      <span class="key">"allowWrite"</span>: [<span class="str">"~/.kube"</span>, <span class="str">"/tmp/build"</span>],
+      <span class="key">"denyRead"</span>:  [<span class="str">"~/"</span>],
+      <span class="key">"allowRead"</span>: [<span class="str">"."</span>]
+    },
+    <span class="key">"credentials"</span>: {
+      <span class="key">"files"</span>: [
+        {<span class="key">"path"</span>: <span class="str">"~/.aws/credentials"</span>, <span class="key">"mode"</span>: <span class="str">"deny"</span>},
+        {<span class="key">"path"</span>: <span class="str">"~/.ssh"</span>, <span class="key">"mode"</span>: <span class="str">"deny"</span>}
+      ],
+      <span class="key">"envVars"</span>: [
+        {<span class="key">"name"</span>: <span class="str">"GITHUB_TOKEN"</span>, <span class="key">"mode"</span>: <span class="str">"mask"</span>}
+      ]
+    }
+  }
+}</pre>
+      <p>Note the prefixes: here <code>/tmp/build</code> is a plain absolute path (different syntax from the Read/Edit rules!). <code>mode: mask</code> for variables is elegant: the sandboxed command sees a sentinel value, and the proxy injects the real one only toward the declared hosts — gh and npm keep working without ever exposing the token.</p>
+    </div>
+  </div>
+</div>
+
+<h3 class="sub-h"><span class="dot">&#9670;</span> Choosing the isolation level</h3>
+<table class="ref">
+  <tr><th style="width:26%;">Option</th><th style="width:44%;">What it isolates</th><th>When</th></tr>
+  <tr><td><b>Built-in Bash sandbox</b></td><td>Filesystem and network of Bash commands, at the OS level</td><td>Daily use with more autonomy and fewer prompts</td></tr>
+  <tr><td><b>Dev container / Docker</b></td><td>The entire execution environment</td><td>Team consistency, or to use bypassPermissions safely</td></tr>
+  <tr><td><b>VM</b></td><td>Everything, kernel included</td><td>Maximum distrust: untrusted code, fully autonomous agents</td></tr>
+</table>
+
+<div class="notebox red">
+  <h4>Prompt injection: the threat to keep in mind</h4>
+  <p>External content (fetched web pages, third-party MCP output, issues, READMEs of cloned repos) can contain hostile instructions that try to hijack Claude. Practical defenses: verify you trust each MCP server before connecting it; keep denies on sensitive files (<code>Read(.env)</code>, <code>Read(~/.ssh/**)</code>); use the sandbox with denied/masked credentials to limit the potential damage; and for heavy autonomy prefer isolated environments. The built-in git protections still block destructive operations like an unrequested <code>git reset --hard</code> by default.</p>
+</div>
+
+<div class="footer-note">Sources: code.claude.com/docs — permissions, permission-modes, sandboxing, sandbox-environments, security · /permissions and /sandbox are the control panels.</div>
+</body></html>
